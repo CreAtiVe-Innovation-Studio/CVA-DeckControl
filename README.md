@@ -1,95 +1,114 @@
 # CVA-DeckControl
 
-Selbstgebauter Treiber mit offen einsehbarem Quellcode (Source-Available,
-siehe "Lizenz" unten) für den **Elgato Stream Deck Mini** und die
-**Streamplify DECK ONE** — komplett YAML-konfiguriert, kein Code nötig für
-eigene Tasten/Seiten/Profile. Kein offizieller Treiber, kein SDK Dritter:
-die USB-Protokolle beider Geräte wurden dafür direkt gegen echte Hardware
-reverse-engineered.
+**Read this in other languages:** 🇩🇪 [Deutsch](docs/README_DE.md)
 
-Entstanden als persönliches Projekt, weil die offizielle Software fehlende
-Features (Live-Wetterradar? Timer mit Analog-Anzeige? ein reaktiver
-Avatar, der auf Flugverkehr vorm Fenster reagiert?) nicht bot — und weil es
-einfach Spaß gemacht hat, die Hardware selbst anzusprechen.
+Self-built driver with openly viewable source (source-available, see
+"License" below) for the **Elgato Stream Deck Mini** and the **Streamplify
+DECK ONE** — fully YAML-configured, no code needed for your own keys/pages/
+profiles. Not an official driver, no third-party SDK: both devices' USB
+protocols were reverse-engineered directly against real hardware for this.
 
-## Was kann es
+Built as a personal project because the official software didn't offer
+some features (live weather radar? an analog-clock timer? a reactive
+avatar that reacts to air traffic outside the window?) — and because it
+was simply fun to talk to the hardware directly.
 
-- **Beliebig viele Tasten/Seiten/Profile**, rein per YAML definiert — neue
-  Taste anlegen heißt: YAML-Block ergänzen, Treiber neu starten, fertig
-- **Live-Radar**: Flugverkehr (adsb.lol) + Niederschlag + Blitzortung, zu
-  einem 15-Kacheln-Kartenbild komponiert, inkl. reaktivem Mii/VTuber-Avatar
-  der auf Wetter/Flugverkehr reagiert
-- **Timer/Stopwatch** mit digitaler oder analoger Anzeige direkt auf der Taste
-- **Browser-Settings-GUI** zum Bearbeiten aller Tasten/Seiten/Profile ohne
-  YAML von Hand anzufassen — inkl. Seiten/Profile anlegen, Tasten von
-  bestehenden Vorlagen übernehmen
-- **Live-Webansicht** beider Geräte (rein zum Spaß, zeigt im Browser was
-  gerade auf der echten Hardware zu sehen ist)
-- **Import/Export** für Elgato-/Streamplify-Profile UND fürs eigene
-  YAML-Format, um Setups mit anderen zu teilen
-- Aktionstypen: Hotkeys, Programme/URLs öffnen, App-Lautstärke, Live-System-
-  Kennzahlen (CPU/RAM/GPU), Home-Assistant-Steuerung, uvm. — volle Liste in
-  [SEITEN-LOGIK.md](SEITEN-LOGIK.md)
+## What it can do
 
-## Unterstützte Hardware
+- **Any number of keys/pages/profiles**, defined purely in YAML — adding a
+  new key means: add a YAML block, restart the driver, done
+- **Live radar**: air traffic (adsb.lol) + precipitation + lightning
+  detection, composed into one 15-tile map image, including a reactive
+  Mii/VTuber avatar that reacts to weather/air traffic
+- **Timer/stopwatch** with digital or analog display directly on the key
+- **Browser settings GUI** for editing all keys/pages/profiles without
+  touching YAML by hand — including creating/renaming/deleting pages and
+  profiles, copying a key from an existing template
+- **Live web view** of both devices (just for fun — shows in the browser
+  what's currently on the real hardware)
+- **Import/export** for Elgato/Streamplify profiles AND for its own YAML
+  format, to share setups with others
+- Action types: hotkeys, launching programs/URLs, per-app volume, live
+  system metrics (CPU/RAM/GPU), Home Assistant control, and more — full
+  list in [SEITEN-LOGIK.md](SEITEN-LOGIK.md) (German, technical reference)
 
-| Gerät | Tasten | Status |
+## Performance
+
+Built to sit quietly in the background, not to be a resource hog:
+
+- **Idle memory footprint: ~20MB RSS**, CPU usage effectively 0% between
+  key presses/render cycles (measured on the reference Linux install —
+  actual numbers will vary with your hardware).
+- Network-heavy features are cached instead of queried live: radar
+  precipitation tiles for 5 minutes, Windows GPU stats refreshed and
+  cached every 5s in the background — no render cycle ever waits on a
+  network round-trip.
+- Icon rendering happens once per config change/page switch, not per frame.
+- The live web view is fully inert when switched off (the default) — the
+  snapshot store behind it is then a plain no-op call, no measurable
+  overhead.
+- Background threads (GPU stats, timer ticker, USB event loops) are
+  lightweight polling loops with multi-second intervals, not tight loops
+  pinning a CPU core.
+
+## Supported hardware
+
+| Device | Keys | Status |
 |---|---|---|
-| Elgato Stream Deck Mini | 6 | Verifiziert |
-| Streamplify DECK ONE | 15 | Verifiziert |
-| Elgato Original / MK.2 / XL | 15 / 15 / 32 | Experimentell, siehe unten |
+| Elgato Stream Deck Mini | 6 | Verified |
+| Streamplify DECK ONE | 15 | Verified |
+| Elgato Original / MK.2 / XL | 15 / 15 / 32 | Experimental, see below |
 
-Andere Elgato-Modelle laufen über einen generischen Code-Pfad
-(`streamdeck_driver/devices/elgato_generic.py`), aber ohne echte Hardware
-zum Testen bleibt das ungetestet — siehe "Plattform-Unterstützung" unten.
+Other Elgato models run through a generic code path
+(`streamdeck_driver/devices/elgato_generic.py`), but without real hardware
+to test against it stays unverified — see "Platform support" below.
 
 ## Setup
 
-**Linux:** `./install.sh` erledigt venv + Abhängigkeiten + Konfig-Vorlagen
-in einem Schritt (überschreibt nie bestehende `config/*.yaml`). Danach:
+**Linux:** `./install.sh` handles venv + dependencies + config templates in
+one step (never overwrites an existing `config/*.yaml`). Then:
 
 ```
 .venv/bin/python3 -m streamdeck_driver.daemon
 ```
 
-**Windows:** entweder Python selbst installieren + `pip install -r requirements.txt`,
-oder die fertig gebaute `.exe` nehmen (kein Python nötig) — siehe
-"Fertige Windows-.exe" unten. Zum SELBER bauen: `tools\build_windows_exe.bat`
-(braucht Python im PATH) — der Build-Pfad ist live gegen echte Hardware
-verifiziert (beide Geräte verbinden, Icons/Config laden korrekt, Autostart
-funktioniert).
+**Windows:** either install Python yourself + `pip install -r requirements.txt`,
+or grab the prebuilt `.exe` (no Python needed) — see "Prebuilt Windows .exe"
+below. To build it YOURSELF: `tools\build_windows_exe.bat` (needs Python on
+PATH) — the build path is verified live against real hardware (both devices
+connect, icons/config load correctly, autostart works).
 
-**Manuell (jede Plattform):**
+**Manual (any platform):**
 1. `pip install -r requirements.txt`
-2. Konfiguration aus den Vorlagen anlegen:
+2. Create your config from the templates:
    ```
    cp config/profiles.example.yaml config/profiles.yaml
    cp config/location.example.yaml config/location.yaml
-   cp config/ha_secrets.example.yaml config/ha_secrets.yaml   # nur falls Home-Assistant genutzt wird
+   cp config/ha_secrets.example.yaml config/ha_secrets.yaml   # only if you use Home Assistant
    ```
-   Eigene Koordinaten/Zugangsdaten eintragen, `profiles.yaml` nach eigenem
-   Bedarf umbauen (siehe SEITEN-LOGIK.md für alle Aktions-/Icon-Typen, oder
-   einfach die Settings-GUI benutzen, siehe unten).
-3. `assets/` muss als Ordner NEBEN diesem Repo-Ordner liegen (nicht darin) —
-   für generierte Icons/Sounds/Avatare, siehe `tools/generate_*.py`. Ohne
-   eigene Assets fällt das Icon-Rendering auf prozedural gezeichnete
-   Platzhalter zurück, der Treiber läuft trotzdem.
-4. Starten: `python3 -m streamdeck_driver.daemon`
+   Fill in your own coordinates/credentials, adapt `profiles.yaml` to your
+   needs (see SEITEN-LOGIK.md for every action/icon type, or just use the
+   Settings GUI, see below).
+3. `assets/` must sit as a sibling folder NEXT TO this repo folder (not
+   inside it) — for generated icons/sounds/avatars, see `tools/generate_*.py`.
+   Without your own assets, icon rendering falls back to procedurally drawn
+   placeholders; the driver still runs fine.
+4. Start: `python3 -m streamdeck_driver.daemon`
 
-## Fertige Windows-.exe
+## Prebuilt Windows .exe
 
-Der komplette Quellcode hier ist für nicht-kommerzielle Nutzung frei (siehe
-"Lizenz" unten) — jede:r kann sich mit `tools\build_windows_exe.bat` selbst
-eine `.exe` bauen, kostet nichts. Wer
-das nicht selbst machen will/kann: eine fertig gebaute .exe gibt es als
-kleine Unterstützung des Projekts über [Buy Me a Coffee](https://buymeacoffee.com/creativeinw).
-Kein Muss, keine Funktions-Einschränkung gegenüber dem Selberbauen — reine
-Bequemlichkeit für alle, die kein Python/PyInstaller aufsetzen wollen.
+The complete source code here is free for non-commercial use (see
+"License" below) — anyone can build their own `.exe` with
+`tools\build_windows_exe.bat`, at no cost. If you'd rather not do that
+yourself: a prebuilt `.exe` is available as a small way to support the
+project via [Buy Me a Coffee](https://buymeacoffee.com/creativeinw). Not
+required, no feature difference versus building it yourself — purely a
+convenience for anyone who doesn't want to set up Python/PyInstaller.
 
-Ergebnis liegt unter `dist\CVA-DeckControl\`. `config\` (eigene
-`profiles.yaml`/`location.yaml`/`ha_secrets.yaml`, siehe Schritt 2 oben) muss
-dort HINEIN kopiert werden, `assets\` daneben, als Geschwister-Ordner von
-`CVA-DeckControl\` selbst (spiegelt exakt die Quellcode-Struktur):
+The build result lands under `dist\CVA-DeckControl\`. `config\` (your own
+`profiles.yaml`/`location.yaml`/`ha_secrets.yaml`, see step 2 above) needs
+to be copied IN there, `assets\` next to it, as a sibling folder of
+`CVA-DeckControl\` itself (mirrors the source layout exactly):
 ```
 dist\
   assets\
@@ -97,116 +116,116 @@ dist\
     CVA-DeckControl.exe
     config\
 ```
-Die Settings-GUI ist in der `.exe` mit eingebaut (kein separates Python-Skript
-nötig) — per `open_gui`-Taste oder direkt `http://127.0.0.1:8420` erreichbar,
-sobald `CVA-DeckControl.exe` läuft.
+The settings GUI is built into the `.exe` (no separate Python script
+needed) — reachable via the `open_gui` key or directly at
+`http://127.0.0.1:8420` once `CVA-DeckControl.exe` is running.
 
-## Settings-GUI
+## Settings GUI
 
-`python3 gui/server.py` — lokale Browser-Oberfläche (kein Flask/FastAPI,
-reine Python-Standardbibliothek) zum Bearbeiten aller Tasten/Seiten/Profile
-statt YAML von Hand zu editieren, unter `http://127.0.0.1:8420`. Kann auch per
-physischer Taste geöffnet werden (Aktions-Typ `open_gui` — startet die GUI
-falls sie nicht läuft und öffnet sie im Browser).
+`python3 gui/server.py` — a local browser interface (no Flask/FastAPI,
+pure Python standard library) for editing every key/page/profile instead
+of hand-editing YAML, at `http://127.0.0.1:8420`. Can also be opened from a
+physical key (action type `open_gui` — starts the GUI if it isn't running
+yet and opens it in the browser).
 
-Neben dem Bearbeiten einzelner Tasten (freie Auswahl aus allen Aktions-/
-Icon-Typen) können direkt in der GUI auch **neue Seiten und Profile
-angelegt, umbenannt und gelöscht** werden (+/✎/✕-Icons neben jedem Eintrag
-in der Seitenleiste) — neue DECK-ONE-Seiten bekommen automatisch
-`page_next`/`page_previous`-Tasten verdrahtet, sofern die Ziel-Tastenplätze
-frei sind. Im Tasten-Editor gibt es zusätzlich "Von bestehender Taste
-übernehmen" — eine Liste aller bereits konfigurierten Tasten im System, mit
-der man Aktion+Icon einer vorhandenen Taste als Ausgangspunkt für eine neue
-übernehmen kann, statt alles neu einzutippen.
+Besides editing individual keys (free choice from every action/icon type),
+the GUI also lets you **create, rename, and delete pages and profiles**
+directly (+/✎/✕ icons next to every entry in the sidebar) — new DECK ONE
+pages automatically get `page_next`/`page_previous` keys wired up, as long
+as those key slots are free. The key editor also has "Copy from an
+existing key" — a list of every key already configured anywhere in the
+system, letting you reuse an existing key's action+icon as a starting
+point instead of typing everything again.
 
-## Eigene Features bauen
+## Building your own features
 
-Drei Stufen, je nachdem was du brauchst:
+Three levels, depending on what you need:
 
-1. **Neue Taste/Seite/Profil** — komplett über die Settings-GUI (siehe oben)
-   oder von Hand in `profiles.yaml`. Kein Code, kein Neustart-Risiko: falsche
-   YAML-Werte landen höchstens als `unmapped`-Taste, nichts crasht.
-2. **Bestehenden Aktions-/Icon-Typ neu kombinieren** — z.B. eigene Hotkeys,
-   Programme, Live-Kennzahlen, Home-Assistant-Entities. Volle Feldreferenz
-   mit Beispiel-YAML für jeden Typ: [SEITEN-LOGIK.md](SEITEN-LOGIK.md).
-3. **Komplett neuer Aktions-Typ** (etwas, das es noch nicht gibt) — eine
-   Funktion in `streamdeck_driver/actions.py` + ein Zweig in `dispatch()`,
-   optional eine Farbe in `icon_render.py`. Kochrezept mit Code-Stellen:
-   Abschnitt 6 in [SEITEN-LOGIK.md](SEITEN-LOGIK.md).
+1. **New key/page/profile** — entirely through the Settings GUI (see
+   above) or by hand in `profiles.yaml`. No code, no restart risk: bad
+   YAML values land as an `unmapped` key at worst, nothing crashes.
+2. **Recombine an existing action/icon type** — e.g. your own hotkeys,
+   programs, live metrics, Home Assistant entities. Full field reference
+   with example YAML for every type: [SEITEN-LOGIK.md](SEITEN-LOGIK.md).
+3. **A brand-new action type** (something that doesn't exist yet) — one
+   function in `streamdeck_driver/actions.py` plus a branch in
+   `dispatch()`, optionally a color in `icon_render.py`. Recipe with exact
+   code locations: section 6 in [SEITEN-LOGIK.md](SEITEN-LOGIK.md).
 
-[SEITEN-LOGIK.md](SEITEN-LOGIK.md) ist bewusst so geschrieben, dass sowohl
-eine KI (Claude Code o.ä.) als auch ein Mensch direkt damit arbeiten kann —
-jede Angabe ist gegen den echten Code verifiziert, keine Vermutungen.
+[SEITEN-LOGIK.md](SEITEN-LOGIK.md) is deliberately written so both an AI
+(Claude Code or similar) and a human can work with it directly — every
+statement in it is verified against the actual code, nothing guessed. It's
+currently German-only.
 
-## Profile importieren/teilen
+## Importing/sharing profiles
 
-- Echtes Elgato-/Streamplify-Profil (Export-Datei/-Ordner) übernehmen:
-  `python3 tools/import_deck_profile.py <pfad> --name <profilname>`
-- Eigenes Profil an jemand anderen weitergeben:
-  `python3 tools/export_profile.py <profilname>`
-- Von jemand anderem erhaltenes Profil einbauen:
-  `python3 tools/import_native_profile.py <datei> --name <eigener-name>`
+- Adopt a real Elgato/Streamplify profile (export file/folder):
+  `python3 tools/import_deck_profile.py <path> --name <profilename>`
+- Share your own profile with someone else:
+  `python3 tools/export_profile.py <profilename>`
+- Import a profile you received from someone else:
+  `python3 tools/import_native_profile.py <file> --name <your-name>`
 
-Unbekannte Aktionen landen als `needs_review`/`unmapped` statt zu crashen
-oder geraten zu werden — danach in der Settings-GUI nachbearbeiten.
+Unknown actions land as `needs_review`/`unmapped` instead of crashing or
+being guessed at — clean them up afterward in the Settings GUI.
 
-## Plattform-Unterstützung
+## Platform support
 
-| Plattform | Status |
+| Platform | Status |
 |---|---|
-| Linux | Getestet, produktiv im Einsatz |
-| Windows | Getestet gegen echte Hardware (DECK ONE + Elgato Mini, Hotkeys, Lautstärke, Screenshot, Ton, GUI, gebaute `.exe`) |
-| macOS | **Experimentell, ungetestet** — keine Mac-Maschine verfügbar |
-| Elgato Original/MK.2/XL | **Experimentell, ungetestet** — nur die Mini ist verifiziert |
+| Linux | Tested, in daily production use |
+| Windows | Tested against real hardware (DECK ONE + Elgato Mini, hotkeys, volume, screenshot, sound, GUI, built `.exe`) |
+| macOS | **Experimental, untested** — no Mac machine available |
+| Elgato Original/MK.2/XL | **Experimental, untested** — only the Mini is verified |
 
-Bei Fehlern auf einer der experimentellen Plattformen/Geräte: bitte ein
-Issue aufmachen (Plattform/Modell + Logausgabe) statt stillschweigend
-aufzugeben — ohne echte Hardware-Rückmeldung lassen sich diese Stellen
-nicht weiter absichern. Details/Vorbehalte stehen jeweils direkt im
-betroffenen Modul (`streamdeck_driver/platform_backend/macos.py`,
+If something breaks on one of the experimental platforms/devices: please
+open an issue (platform/model + log output) instead of silently giving up
+— without real hardware feedback these spots can't be hardened further.
+Details/caveats live directly in the affected module
+(`streamdeck_driver/platform_backend/macos.py`,
 `streamdeck_driver/devices/elgato_generic.py`).
 
-## Häufige Fragen
+## FAQ
 
-**Brauche ich Home Assistant?** Nein — nur für die optionalen
-`ha_toggle`/`ha_cover`/`ha_sensor`-Aktionstypen und die Blitzortung im Radar.
-Ohne `config/ha_secrets.yaml` laufen diese Features einfach nicht mit, der
-Rest bleibt unberührt.
+**Do I need Home Assistant?** No — only for the optional
+`ha_toggle`/`ha_cover`/`ha_sensor` action types and the lightning
+detection in the radar. Without `config/ha_secrets.yaml` those features
+simply don't come online, everything else is unaffected.
 
-**Ist meine Konfiguration/mein Standort öffentlich, wenn ich das Repo nutze?**
-Nein — `config/*.yaml` (deine echten Tasten, Koordinaten, Zugangsdaten) ist
-per `.gitignore` ausgeschlossen. Committed sind nur `*.example.yaml`-Vorlagen
-mit Platzhalterwerten.
+**Is my configuration/location public if I use this repo?** No —
+`config/*.yaml` (your real keys, coordinates, credentials) is excluded via
+`.gitignore`. Only `*.example.yaml` templates with placeholder values are
+committed.
 
-**Ich habe keine Ahnung von Python — kann ich trotzdem eigene Tasten bauen?**
-Ja, über die Settings-GUI (siehe oben) oder direkt in `profiles.yaml` nach
-den Beispielen aus [SEITEN-LOGIK.md](SEITEN-LOGIK.md) — Code-Änderungen
-braucht es dafür nicht.
+**I have no idea about Python — can I still build my own keys?** Yes, via
+the Settings GUI (see above) or directly in `profiles.yaml` following the
+examples in [SEITEN-LOGIK.md](SEITEN-LOGIK.md) — no code changes needed
+for that.
 
-**Was, wenn mein Gerät/Betriebssystem als "experimentell" markiert ist?**
-Der Code dafür existiert und ist nach bestem Wissen geschrieben, aber ohne
-echte Hardware zum Gegenchecken nicht abgesichert. Ein Issue mit Log/Fehler
-hilft mehr als stillschweigend aufzugeben.
+**What if my device/OS is marked "experimental"?** The code for it exists
+and was written to the best of my knowledge, but isn't hardened without
+real hardware to check it against. An issue with a log/error helps more
+than silently giving up.
 
-## Mitmachen / Fehler melden
+## Contributing / reporting issues
 
-Issues sind willkommen — am hilfreichsten sind: welches Gerät/welche
-Plattform, was genau nicht funktioniert, und wenn möglich die Log-Ausgabe.
-Besonders für die als experimentell markierten Stellen (macOS, andere
-Elgato-Modelle) ist echtes Feedback der einzige Weg, die abzusichern.
+Issues are welcome — most helpful are: which device/platform, what
+exactly doesn't work, and log output if possible. For the parts marked
+experimental (macOS, other Elgato models) especially, real feedback is
+the only way to harden them.
 
-## Lizenz
+## License
 
-[PolyForm Noncommercial License 1.0.0](LICENSE) — frei nutzbar, veränderbar
-und weitergebbar für **nicht-kommerzielle Zwecke** (privat, Hobby, Lernen,
-Forschung, gemeinnützige/öffentliche Einrichtungen). Für **kommerzielle
-Nutzung** (Firmen, Einbau in ein eigenes Produkt/Angebot) wird eine separate
-Lizenz benötigt — dafür einfach Kontakt aufnehmen: creative.info@gmx.de.
+[PolyForm Noncommercial License 1.0.0](LICENSE) — free to use, modify, and
+redistribute for **non-commercial purposes** (personal, hobby, learning,
+research, charitable/public institutions). **Commercial use** (a company
+using it, building it into your own product/offering) requires a separate
+license — just get in touch: creative.info@gmx.de.
 
-## Nicht anfassen
+## Hands off
 
-`streamdeck_driver/devices/base.py`, `deckone.py`, `elgato_mini.py` (USB/HID-
-Protokoll, gegen echte Hardware reverse-engineered — nur bei echten
-Hardware-Problemen ändern) sowie `manifest_parser.py`/`action_translation.py`
-(ursprüngliches Einmal-Migrationsscript, für eigene Importe stattdessen
-`tools/import_deck_profile.py` benutzen).
+`streamdeck_driver/devices/base.py`, `deckone.py`, `elgato_mini.py`
+(USB/HID protocol, reverse-engineered against real hardware — only change
+for genuine hardware issues) as well as `manifest_parser.py`/
+`action_translation.py` (the original one-time migration script; for your
+own imports use `tools/import_deck_profile.py` instead).
