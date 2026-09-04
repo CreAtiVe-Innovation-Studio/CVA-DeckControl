@@ -1,0 +1,7 @@
+# Optionale Extra-Abhaengigkeiten NUR fuer die Bild-Erzeugungs-Tools
+# (tools/generate_avatar_poses.py, tools/remove_backgrounds.py) - fuer den
+# eigentlichen Treiber (daemon.py) nicht noetig, siehe requirements.txt.
+rembg>=2.0
+onnxruntime>=1.20
+numpy>=1.24
+scipy>=1.11

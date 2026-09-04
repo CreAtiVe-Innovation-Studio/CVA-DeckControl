@@ -1,0 +1,129 @@
+"""Linux-Backend - identische Implementierung wie vor dem Portabilitaets-
+Umbau, nur aus actions.py/process_monitor.py/timer_engine.py hierher verschoben.
+Getestet gegen echte Hardware (siehe SEITEN-LOGIK.md / CLAUDE.md-Historie)."""
+from __future__ import annotations
+
+import logging
+import re
+import shlex
+import subprocess
+from pathlib import Path
+
+from .. import vkeycode_map
+
+logger = logging.getLogger("streamdeck_driver.platform_backend.linux")
+
+
+def send_hotkey(vkeycode: int, ctrl: bool, shift: bool, alt: bool) -> None:
+    codes = vkeycode_map.resolve(vkeycode, ctrl, shift, alt)
+    if not codes:
+        logger.warning("Hotkey vkeycode=%s: keine bekannte Linux-Zuordnung, ignoriert", vkeycode)
+        return
+    seq = [f"{c}:1" for c in codes] + [f"{codes[-1]}:0"] + [f"{c}:0" for c in reversed(codes[:-1])]
+    try:
+        subprocess.run(["ydotool", "key", *seq], check=True, timeout=5)
+        logger.info("Hotkey ausgefuehrt: vkeycode=%s -> %s", vkeycode, codes)
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        logger.error("Hotkey fehlgeschlagen (vkeycode=%s): %s", vkeycode, exc)
+
+
+def open_command(cmd: str) -> None:
+    if not cmd:
+        return
+    try:
+        subprocess.Popen(shlex.split(cmd))
+        logger.info("Programm gestartet: %s", cmd)
+    except OSError as exc:
+        logger.error("Programm konnte nicht gestartet werden (%s): %s", cmd, exc)
+
+
+def open_url(url: str) -> None:
+    if not url:
+        return
+    try:
+        subprocess.Popen(["xdg-open", url])
+        logger.info("Website geoeffnet: %s", url)
+    except OSError as exc:
+        logger.error("Website konnte nicht geoeffnet werden (%s): %s", url, exc)
+
+
+def take_screenshot_interactive() -> None:
+    """Siehe actions.py-Historie: ydotool-PrintScreen loest unter GNOME/
+    Wayland keinen Screenshot aus, direkter D-Bus-Aufruf scheitert an
+    Portal-Berechtigungen -> 'gnome-screenshot' CLI direkt. Clipboard-Kopie
+    per 'wl-copy' aus einer temporaeren Datei, da kurzlebige Prozesse ihre
+    Wayland-Clipboard-Ownership sofort nach Prozessende verlieren."""
+    try:
+        subprocess.Popen([
+            "bash", "-c",
+            'f=$(mktemp --suffix=.png) && gnome-screenshot --area --file="$f" '
+            '&& wl-copy < "$f" && rm -f "$f"',
+        ])
+        logger.info("Screenshot-Bereichsauswahl gestartet (Datei + wl-copy)")
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        logger.error("Screenshot fehlgeschlagen: %s", exc)
+
+
+def set_app_volume(app_name: str, direction: str, step_percent: int = 5) -> None:
+    """App-spezifische Lautstaerke ueber wpctl (PipeWire) - sucht im
+    'Streams'-Abschnitt von 'wpctl status' nach einem laufenden Audio-Stream,
+    dessen Name app_name enthaelt, kein Fehler falls die App keinen Ton spielt."""
+    try:
+        result = subprocess.run(["wpctl", "status"], capture_output=True, text=True, check=True, timeout=5)
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        logger.error("App-Lautstaerke: wpctl status fehlgeschlagen: %s", exc)
+        return
+
+    lines = result.stdout.splitlines()
+    try:
+        start = next(i for i, l in enumerate(lines) if l.strip().startswith("Streams:"))
+    except StopIteration:
+        logger.warning("App-Lautstaerke: kein 'Streams'-Abschnitt in wpctl-Ausgabe gefunden")
+        return
+
+    stream_line_re = re.compile(r"^\s*[│├└\-\s]*(\d+)\.\s*(.+?)\s*\[vol:")
+    matched_ids: list[str] = []
+    for line in lines[start + 1:]:
+        stripped = line.strip()
+        if stripped.startswith(("Sinks", "Sources", "Filters", "Devices")) or (stripped == "" and matched_ids):
+            break
+        m = stream_line_re.match(line)
+        if m and app_name.lower() in m.group(2).lower():
+            matched_ids.append(m.group(1))
+
+    if not matched_ids:
+        logger.info("App-Lautstaerke: kein aktiver Audio-Stream fuer '%s' gefunden - keine Aktion", app_name)
+        return
+
+    sign = "+" if direction == "up" else "-"
+    for sid in matched_ids:
+        try:
+            subprocess.run(["wpctl", "set-volume", sid, f"{step_percent}%{sign}"], check=True, timeout=5)
+            logger.info("App-Lautstaerke: '%s' (Stream-ID %s) %s%% %s", app_name, sid, step_percent, direction)
+        except (subprocess.SubprocessError, FileNotFoundError) as exc:
+            logger.error("App-Lautstaerke: wpctl set-volume fehlgeschlagen (ID %s): %s", sid, exc)
+
+
+_AUDIO_PLAYERS = ("pw-play", "aplay", "ffplay")
+
+
+def play_sound(path: Path) -> None:
+    for player in _AUDIO_PLAYERS:
+        args = {
+            "pw-play": [player, str(path)],
+            "aplay": [player, "-q", str(path)],
+            "ffplay": [player, "-nodisp", "-autoexit", "-loglevel", "quiet", str(path)],
+        }[player]
+        try:
+            subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return
+        except FileNotFoundError:
+            continue
+    logger.warning("Kein Audio-Player (pw-play/aplay/ffplay) gefunden - Ton uebersprungen")
+
+
+def show_message_popup(title: str, text: str) -> None:
+    try:
+        subprocess.Popen(["zenity", "--info", f"--title={title}", f"--text={text}", "--width=320"])
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        logger.error("zenity-Anzeige fehlgeschlagen: %s", exc)

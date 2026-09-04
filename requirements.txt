@@ -1,0 +1,18 @@
+# Kern-Abhaengigkeiten - laufen auf Linux, Windows und (theoretisch,
+# EXPERIMENTELL) macOS. WICHTIG: 'hidapi', nicht 'hid' - das PyPI-Paket
+# 'hid' ist nur ein duenner ctypes-Wrapper ohne die eigentliche hidapi.dll/.so
+# (auf Windows live getestet bestaetigt, siehe streamdeck_driver/devices/
+# elgato_generic.py), 'hidapi' bringt die kompilierten Binaries direkt mit
+# und exponiert denselben 'import hid'-Namespace.
+hidapi>=0.14
+pyusb>=1.2         # nur fuer die DECK ONE unter Linux - unter Windows laeuft die komplett ueber hidapi
+Pillow>=10.0
+psutil>=5.9
+requests>=2.31
+PyYAML>=6.0
+
+# Nur unter Windows gebraucht (app_volume-Aktionstyp, siehe
+# platform_backend/windows.py) - pip installiert das per Marker automatisch
+# nur dort, unter Linux/macOS wird die Zeile ignoriert.
+pycaw>=20240210; sys_platform == "win32"
+comtypes>=1.2; sys_platform == "win32"

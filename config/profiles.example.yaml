@@ -1,0 +1,133 @@
+# Beispiel-Konfiguration - zeigt die wichtigsten Aktions-/Icon-Typen anhand
+# eines kompakten, frei erfundenen Setups. Das ist NICHT die echte
+# profiles.yaml von irgendjemandem (die ist per .gitignore ausgeschlossen)
+# - kopieren, umbenennen zu profiles.yaml, nach eigenem Bedarf umbauen.
+#
+# Volle Feld-Referenz + Kochrezepte fuer neue Tasten/Seiten/Profile: siehe
+# SEITEN-LOGIK.md.
+version: 1
+elgato:
+  pages:
+    modi:
+      keys:
+        0:
+          name: Open
+          title: Buero
+          action:
+            type: switch_profile
+            profile: buero
+          icon:
+            type: generated
+        1:
+          name: Open
+          title: Musik
+          action:
+            type: switch_profile
+            profile: musik
+          icon:
+            type: generated
+        5:
+          name: Naechste Seite
+          title: ''
+          action:
+            type: page_next
+          icon:
+            type: generated
+deckone:
+  active_profile: buero
+  profiles:
+    buero:
+      color: '#0078D4'
+      pages:
+      - name: Buero
+        keys:
+          0:
+            name: Firefox
+            title: Firefox
+            action:
+              type: open
+              linux_command: firefox
+            icon:
+              type: generated
+          1:
+            name: Copy
+            title: ''
+            action:
+              type: hotkey
+              vkeycode: 67
+              ctrl: true
+              shift: false
+              alt: false
+            icon:
+              type: generated
+          2:
+            name: Docs
+            title: Docs
+            action:
+              type: website
+              url: https://docs.google.com
+            icon:
+              type: generated
+          3:
+            name: CPU
+            title: CPU
+            action:
+              type: live_stat
+              metric: cpu
+            icon:
+              type: generated
+          4:
+            name: Pomodoro
+            title: Pomodoro 25min
+            action:
+              type: timer
+              duration_min: 25
+              sound: default
+              style: digital
+            icon:
+              type: generated
+          5:
+            name: Live-Ansicht
+            title: Live-Ansicht
+            action:
+              type: live_view_toggle
+            icon:
+              type: generated
+          6:
+            name: Licht
+            title: Licht Buero
+            action:
+              type: ha_toggle
+              entity_id: light.buero
+            icon:
+              type: generated
+          7:
+            name: Einstellungen
+            title: Einstellungen
+            action:
+              type: open_gui
+            icon:
+              type: generated
+    musik:
+      color: '#00C851'
+      pages:
+      - name: Musik
+        keys:
+          0:
+            name: Lautstaerke +
+            title: Vol +
+            action:
+              type: app_volume
+              app_name: spotify
+              direction: up
+            icon:
+              type: generated
+          1:
+            name: Lautstaerke -
+            title: Vol -
+            action:
+              type: app_volume
+              app_name: spotify
+              direction: down
+            icon:
+              type: generated

@@ -1,0 +1,212 @@
+# CVA-DeckControl
+
+Selbstgebauter Treiber mit offen einsehbarem Quellcode (Source-Available,
+siehe "Lizenz" unten) für den **Elgato Stream Deck Mini** und die
+**Streamplify DECK ONE** — komplett YAML-konfiguriert, kein Code nötig für
+eigene Tasten/Seiten/Profile. Kein offizieller Treiber, kein SDK Dritter:
+die USB-Protokolle beider Geräte wurden dafür direkt gegen echte Hardware
+reverse-engineered.
+
+Entstanden als persönliches Projekt, weil die offizielle Software fehlende
+Features (Live-Wetterradar? Timer mit Analog-Anzeige? ein reaktiver
+Avatar, der auf Flugverkehr vorm Fenster reagiert?) nicht bot — und weil es
+einfach Spaß gemacht hat, die Hardware selbst anzusprechen.
+
+## Was kann es
+
+- **Beliebig viele Tasten/Seiten/Profile**, rein per YAML definiert — neue
+  Taste anlegen heißt: YAML-Block ergänzen, Treiber neu starten, fertig
+- **Live-Radar**: Flugverkehr (adsb.lol) + Niederschlag + Blitzortung, zu
+  einem 15-Kacheln-Kartenbild komponiert, inkl. reaktivem Mii/VTuber-Avatar
+  der auf Wetter/Flugverkehr reagiert
+- **Timer/Stopwatch** mit digitaler oder analoger Anzeige direkt auf der Taste
+- **Browser-Settings-GUI** zum Bearbeiten aller Tasten/Seiten/Profile ohne
+  YAML von Hand anzufassen — inkl. Seiten/Profile anlegen, Tasten von
+  bestehenden Vorlagen übernehmen
+- **Live-Webansicht** beider Geräte (rein zum Spaß, zeigt im Browser was
+  gerade auf der echten Hardware zu sehen ist)
+- **Import/Export** für Elgato-/Streamplify-Profile UND fürs eigene
+  YAML-Format, um Setups mit anderen zu teilen
+- Aktionstypen: Hotkeys, Programme/URLs öffnen, App-Lautstärke, Live-System-
+  Kennzahlen (CPU/RAM/GPU), Home-Assistant-Steuerung, uvm. — volle Liste in
+  [SEITEN-LOGIK.md](SEITEN-LOGIK.md)
+
+## Unterstützte Hardware
+
+| Gerät | Tasten | Status |
+|---|---|---|
+| Elgato Stream Deck Mini | 6 | Verifiziert |
+| Streamplify DECK ONE | 15 | Verifiziert |
+| Elgato Original / MK.2 / XL | 15 / 15 / 32 | Experimentell, siehe unten |
+
+Andere Elgato-Modelle laufen über einen generischen Code-Pfad
+(`streamdeck_driver/devices/elgato_generic.py`), aber ohne echte Hardware
+zum Testen bleibt das ungetestet — siehe "Plattform-Unterstützung" unten.
+
+## Setup
+
+**Linux:** `./install.sh` erledigt venv + Abhängigkeiten + Konfig-Vorlagen
+in einem Schritt (überschreibt nie bestehende `config/*.yaml`). Danach:
+
+```
+.venv/bin/python3 -m streamdeck_driver.daemon
+```
+
+**Windows:** entweder Python selbst installieren + `pip install -r requirements.txt`,
+oder die fertig gebaute `.exe` nehmen (kein Python nötig) — siehe
+"Fertige Windows-.exe" unten. Zum SELBER bauen: `tools\build_windows_exe.bat`
+(braucht Python im PATH) — der Build-Pfad ist live gegen echte Hardware
+verifiziert (beide Geräte verbinden, Icons/Config laden korrekt, Autostart
+funktioniert).
+
+**Manuell (jede Plattform):**
+1. `pip install -r requirements.txt`
+2. Konfiguration aus den Vorlagen anlegen:
+   ```
+   cp config/profiles.example.yaml config/profiles.yaml
+   cp config/location.example.yaml config/location.yaml
+   cp config/ha_secrets.example.yaml config/ha_secrets.yaml   # nur falls Home-Assistant genutzt wird
+   ```
+   Eigene Koordinaten/Zugangsdaten eintragen, `profiles.yaml` nach eigenem
+   Bedarf umbauen (siehe SEITEN-LOGIK.md für alle Aktions-/Icon-Typen, oder
+   einfach die Settings-GUI benutzen, siehe unten).
+3. `assets/` muss als Ordner NEBEN diesem Repo-Ordner liegen (nicht darin) —
+   für generierte Icons/Sounds/Avatare, siehe `tools/generate_*.py`. Ohne
+   eigene Assets fällt das Icon-Rendering auf prozedural gezeichnete
+   Platzhalter zurück, der Treiber läuft trotzdem.
+4. Starten: `python3 -m streamdeck_driver.daemon`
+
+## Fertige Windows-.exe
+
+Der komplette Quellcode hier ist für nicht-kommerzielle Nutzung frei (siehe
+"Lizenz" unten) — jede:r kann sich mit `tools\build_windows_exe.bat` selbst
+eine `.exe` bauen, kostet nichts. Wer
+das nicht selbst machen will/kann: eine fertig gebaute .exe gibt es als
+kleine Unterstützung des Projekts über [Buy Me a Coffee](https://buymeacoffee.com/creativeinw).
+Kein Muss, keine Funktions-Einschränkung gegenüber dem Selberbauen — reine
+Bequemlichkeit für alle, die kein Python/PyInstaller aufsetzen wollen.
+
+Ergebnis liegt unter `dist\CVA-DeckControl\`. `config\` (eigene
+`profiles.yaml`/`location.yaml`/`ha_secrets.yaml`, siehe Schritt 2 oben) muss
+dort HINEIN kopiert werden, `assets\` daneben, als Geschwister-Ordner von
+`CVA-DeckControl\` selbst (spiegelt exakt die Quellcode-Struktur):
+```
+dist\
+  assets\
+  CVA-DeckControl\
+    CVA-DeckControl.exe
+    config\
+```
+Die Settings-GUI ist in der `.exe` mit eingebaut (kein separates Python-Skript
+nötig) — per `open_gui`-Taste oder direkt `http://127.0.0.1:8420` erreichbar,
+sobald `CVA-DeckControl.exe` läuft.
+
+## Settings-GUI
+
+`python3 gui/server.py` — lokale Browser-Oberfläche (kein Flask/FastAPI,
+reine Python-Standardbibliothek) zum Bearbeiten aller Tasten/Seiten/Profile
+statt YAML von Hand zu editieren, unter `http://127.0.0.1:8420`. Kann auch per
+physischer Taste geöffnet werden (Aktions-Typ `open_gui` — startet die GUI
+falls sie nicht läuft und öffnet sie im Browser).
+
+Neben dem Bearbeiten einzelner Tasten (freie Auswahl aus allen Aktions-/
+Icon-Typen) können direkt in der GUI auch **neue Seiten und Profile
+angelegt, umbenannt und gelöscht** werden (+/✎/✕-Icons neben jedem Eintrag
+in der Seitenleiste) — neue DECK-ONE-Seiten bekommen automatisch
+`page_next`/`page_previous`-Tasten verdrahtet, sofern die Ziel-Tastenplätze
+frei sind. Im Tasten-Editor gibt es zusätzlich "Von bestehender Taste
+übernehmen" — eine Liste aller bereits konfigurierten Tasten im System, mit
+der man Aktion+Icon einer vorhandenen Taste als Ausgangspunkt für eine neue
+übernehmen kann, statt alles neu einzutippen.
+
+## Eigene Features bauen
+
+Drei Stufen, je nachdem was du brauchst:
+
+1. **Neue Taste/Seite/Profil** — komplett über die Settings-GUI (siehe oben)
+   oder von Hand in `profiles.yaml`. Kein Code, kein Neustart-Risiko: falsche
+   YAML-Werte landen höchstens als `unmapped`-Taste, nichts crasht.
+2. **Bestehenden Aktions-/Icon-Typ neu kombinieren** — z.B. eigene Hotkeys,
+   Programme, Live-Kennzahlen, Home-Assistant-Entities. Volle Feldreferenz
+   mit Beispiel-YAML für jeden Typ: [SEITEN-LOGIK.md](SEITEN-LOGIK.md).
+3. **Komplett neuer Aktions-Typ** (etwas, das es noch nicht gibt) — eine
+   Funktion in `streamdeck_driver/actions.py` + ein Zweig in `dispatch()`,
+   optional eine Farbe in `icon_render.py`. Kochrezept mit Code-Stellen:
+   Abschnitt 6 in [SEITEN-LOGIK.md](SEITEN-LOGIK.md).
+
+[SEITEN-LOGIK.md](SEITEN-LOGIK.md) ist bewusst so geschrieben, dass sowohl
+eine KI (Claude Code o.ä.) als auch ein Mensch direkt damit arbeiten kann —
+jede Angabe ist gegen den echten Code verifiziert, keine Vermutungen.
+
+## Profile importieren/teilen
+
+- Echtes Elgato-/Streamplify-Profil (Export-Datei/-Ordner) übernehmen:
+  `python3 tools/import_deck_profile.py <pfad> --name <profilname>`
+- Eigenes Profil an jemand anderen weitergeben:
+  `python3 tools/export_profile.py <profilname>`
+- Von jemand anderem erhaltenes Profil einbauen:
+  `python3 tools/import_native_profile.py <datei> --name <eigener-name>`
+
+Unbekannte Aktionen landen als `needs_review`/`unmapped` statt zu crashen
+oder geraten zu werden — danach in der Settings-GUI nachbearbeiten.
+
+## Plattform-Unterstützung
+
+| Plattform | Status |
+|---|---|
+| Linux | Getestet, produktiv im Einsatz |
+| Windows | Getestet gegen echte Hardware (DECK ONE + Elgato Mini, Hotkeys, Lautstärke, Screenshot, Ton, GUI, gebaute `.exe`) |
+| macOS | **Experimentell, ungetestet** — keine Mac-Maschine verfügbar |
+| Elgato Original/MK.2/XL | **Experimentell, ungetestet** — nur die Mini ist verifiziert |
+
+Bei Fehlern auf einer der experimentellen Plattformen/Geräte: bitte ein
+Issue aufmachen (Plattform/Modell + Logausgabe) statt stillschweigend
+aufzugeben — ohne echte Hardware-Rückmeldung lassen sich diese Stellen
+nicht weiter absichern. Details/Vorbehalte stehen jeweils direkt im
+betroffenen Modul (`streamdeck_driver/platform_backend/macos.py`,
+`streamdeck_driver/devices/elgato_generic.py`).
+
+## Häufige Fragen
+
+**Brauche ich Home Assistant?** Nein — nur für die optionalen
+`ha_toggle`/`ha_cover`/`ha_sensor`-Aktionstypen und die Blitzortung im Radar.
+Ohne `config/ha_secrets.yaml` laufen diese Features einfach nicht mit, der
+Rest bleibt unberührt.
+
+**Ist meine Konfiguration/mein Standort öffentlich, wenn ich das Repo nutze?**
+Nein — `config/*.yaml` (deine echten Tasten, Koordinaten, Zugangsdaten) ist
+per `.gitignore` ausgeschlossen. Committed sind nur `*.example.yaml`-Vorlagen
+mit Platzhalterwerten.
+
+**Ich habe keine Ahnung von Python — kann ich trotzdem eigene Tasten bauen?**
+Ja, über die Settings-GUI (siehe oben) oder direkt in `profiles.yaml` nach
+den Beispielen aus [SEITEN-LOGIK.md](SEITEN-LOGIK.md) — Code-Änderungen
+braucht es dafür nicht.
+
+**Was, wenn mein Gerät/Betriebssystem als "experimentell" markiert ist?**
+Der Code dafür existiert und ist nach bestem Wissen geschrieben, aber ohne
+echte Hardware zum Gegenchecken nicht abgesichert. Ein Issue mit Log/Fehler
+hilft mehr als stillschweigend aufzugeben.
+
+## Mitmachen / Fehler melden
+
+Issues sind willkommen — am hilfreichsten sind: welches Gerät/welche
+Plattform, was genau nicht funktioniert, und wenn möglich die Log-Ausgabe.
+Besonders für die als experimentell markierten Stellen (macOS, andere
+Elgato-Modelle) ist echtes Feedback der einzige Weg, die abzusichern.
+
+## Lizenz
+
+[PolyForm Noncommercial License 1.0.0](LICENSE) — frei nutzbar, veränderbar
+und weitergebbar für **nicht-kommerzielle Zwecke** (privat, Hobby, Lernen,
+Forschung, gemeinnützige/öffentliche Einrichtungen). Für **kommerzielle
+Nutzung** (Firmen, Einbau in ein eigenes Produkt/Angebot) wird eine separate
+Lizenz benötigt — dafür einfach Kontakt aufnehmen: creative.info@gmx.de.
+
+## Nicht anfassen
+
+`streamdeck_driver/devices/base.py`, `deckone.py`, `elgato_mini.py` (USB/HID-
+Protokoll, gegen echte Hardware reverse-engineered — nur bei echten
+Hardware-Problemen ändern) sowie `manifest_parser.py`/`action_translation.py`
+(ursprüngliches Einmal-Migrationsscript, für eigene Importe stattdessen
+`tools/import_deck_profile.py` benutzen).

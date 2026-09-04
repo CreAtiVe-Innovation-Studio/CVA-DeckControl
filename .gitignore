@@ -1,0 +1,32 @@
+# Persoenliche/geheime Konfiguration - siehe die *.example.yaml-Vorlagen
+config/ha_secrets.yaml
+config/location.yaml
+config/profiles.yaml
+config/backups/
+
+# Laufzeit-Zustand (An/Aus-Flag der Live-Ansicht, siehe live_view.py) - keine
+# Konfiguration, wird vom laufenden Daemon erzeugt/geloescht
+config/live_view.enabled
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.venv-*/
+*.egg-info/
+
+# Laufzeit-/Build-Artefakte
+logs/
+*.log
+scratch_*
+
+# PyInstaller-Build-Output (siehe tools/build_windows_exe.*) - bewusst NICHT
+# im Repo, das fertige .exe ist der Buy-Me-a-Coffee-Convenience-Download,
+# der Quellcode zum Selberbauen bleibt hier komplett kostenlos.
+dist/
+build/
+
+# Editor/OS
+.DS_Store
+*.swp

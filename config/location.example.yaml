@@ -1,0 +1,9 @@
+# Vorlage fuer config/location.yaml (die echte Datei ist per .gitignore
+# ausgeschlossen). Kopieren, umbenennen zu location.yaml, eigene Koordinaten
+# eintragen: cp config/location.example.yaml config/location.yaml
+#
+# Platzhalter unten ist NICHT irgendwo real (Nullmeridian/Aequator-Kreuzung
+# im Atlantik) - bewusst offensichtlich falsch, damit niemand es versehentlich
+# unveraendert laufen laesst und denkt, es zeigt echte Daten.
+home_lat: 0.0
+home_lon: 0.0
