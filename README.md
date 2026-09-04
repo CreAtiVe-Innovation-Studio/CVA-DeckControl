@@ -100,10 +100,12 @@ connect, icons/config load correctly, autostart works).
 The complete source code here is free for non-commercial use (see
 "License" below) — anyone can build their own `.exe` with
 `tools\build_windows_exe.bat`, at no cost. If you'd rather not do that
-yourself: a prebuilt `.exe` is available as a small way to support the
-project via [Buy Me a Coffee](https://buymeacoffee.com/creativeinw). Not
-required, no feature difference versus building it yourself — purely a
-convenience for anyone who doesn't want to set up Python/PyInstaller.
+yourself: a prebuilt `.exe` is available directly under
+[Releases](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
+— no strings attached, same as building it yourself. If you'd like to
+support the project anyway, there's an optional
+[Buy Me a Coffee](https://buymeacoffee.com/creativeinw) — entirely
+voluntary, not tied to the download in any way.
 
 The build result lands under `dist\CVA-DeckControl\`. `config\` (your own
 `profiles.yaml`/`location.yaml`/`ha_secrets.yaml`, see step 2 above) needs

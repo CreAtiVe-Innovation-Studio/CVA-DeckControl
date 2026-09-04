@@ -104,10 +104,12 @@ funktioniert).
 Der komplette Quellcode hier ist für nicht-kommerzielle Nutzung frei (siehe
 "Lizenz" unten) — jede:r kann sich mit `tools\build_windows_exe.bat` selbst
 eine `.exe` bauen, kostet nichts. Wer das nicht selbst machen will/kann:
-eine fertig gebaute .exe gibt es als kleine Unterstützung des Projekts über
-[Buy Me a Coffee](https://buymeacoffee.com/creativeinw). Kein Muss, keine
-Funktions-Einschränkung gegenüber dem Selberbauen — reine Bequemlichkeit
-für alle, die kein Python/PyInstaller aufsetzen wollen.
+eine fertig gebaute .exe gibt es direkt unter
+[Releases](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
+— ohne Umweg, genau wie beim Selberbauen. Wer das Projekt trotzdem
+unterstützen möchte: es gibt ein optionales
+[Buy Me a Coffee](https://buymeacoffee.com/creativeinw) — komplett
+freiwillig, an nichts gekoppelt.
 
 Ergebnis liegt unter `dist\CVA-DeckControl\`. `config\` (eigene
 `profiles.yaml`/`location.yaml`/`ha_secrets.yaml`, siehe Schritt 2 oben) muss
