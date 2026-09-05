@@ -38,6 +38,18 @@ class DeckOneController:
         self._radar_frame: radar.RadarFrame | None = None
         self._radar_zoom_idx = 0
         self._radar_info: tuple[int, dict, float] | None = None  # (key_index, aircraft, expires_at)
+        # Schuetzt jede Sequenz aus set_key_image()-Aufrufen + end_batch() als
+        # EINE atomare Einheit - ohne das koennen der 3s-Hintergrund-Refresh
+        # (start_stat_refresh) und ein zeitgleicher Tastendruck/Profilwechsel
+        # (vom Elgato-Mini-Event-Thread) ihre Bild-Uploads auf demselben
+        # USB-Geraet verschachteln, was zu sichtbar korrupten/gemischten
+        # Kacheln fuehrt (live gemeldet: "halb grau halb Bild", alte Kachel
+        # bleibt nach Profilwechsel stehen; per Stresstest mit einem Fake-
+        # Geraet reproduziert: 15 von 90 Batches vermischt ohne den Lock,
+        # 0 von 90 mit ihm). RLock, da verschachtelte Aufrufe im selben
+        # Thread vorkommen (render_current_page -> _render_radar_page ->
+        # _apply_radar_info_overlay).
+        self._render_lock = threading.RLock()
 
     @property
     def connected(self) -> bool:
@@ -72,20 +84,21 @@ class DeckOneController:
         return pages[self.current_page_index].get("keys", {})
 
     def render_current_page(self) -> None:
-        if self.active_profile == "radar":
-            self._render_radar_page()
-            return
-        keys = self._current_page_keys()
-        size = self.device.info.image_size
-        stats = hw_monitor.snapshot() if self.active_profile in ("system", "ki") else None
-        for idx in range(self.device.info.num_keys):
-            key = keys.get(idx)
-            img = blank_icon(size) if key is None else self._render_key_icon_for(key, stats, size, idx)
-            ok = self._set_key_image(idx, img)
-            if not ok:
-                logger.warning("DECK ONE Taste %s: Bild setzen fehlgeschlagen", idx)
-        self.device.end_batch()
-        logger.info("DECK ONE: Profil '%s' Seite %s gerendert", self.active_profile, self.current_page_index)
+        with self._render_lock:
+            if self.active_profile == "radar":
+                self._render_radar_page()
+                return
+            keys = self._current_page_keys()
+            size = self.device.info.image_size
+            stats = hw_monitor.snapshot() if self.active_profile in ("system", "ki") else None
+            for idx in range(self.device.info.num_keys):
+                key = keys.get(idx)
+                img = blank_icon(size) if key is None else self._render_key_icon_for(key, stats, size, idx)
+                ok = self._set_key_image(idx, img)
+                if not ok:
+                    logger.warning("DECK ONE Taste %s: Bild setzen fehlgeschlagen", idx)
+            self.device.end_batch()
+            logger.info("DECK ONE: Profil '%s' Seite %s gerendert", self.active_profile, self.current_page_index)
 
     def _render_radar_page(self) -> None:
         """Sonderfall: die Radar-Seite wird NICHT Taste-fuer-Taste aus der
@@ -192,8 +205,13 @@ class DeckOneController:
 
         def _restore():
             time.sleep(FLASH_DURATION_S)
-            self._set_key_image(key_index, normal_img)
-            self.device.end_batch()
+            # Laeuft in einem eigenen Thread, lange NACHDEM der urspruengliche
+            # handle_key()-Aufruf zurueckgekehrt ist - braucht deshalb sein
+            # eigenes Lock statt sich auf den (laengst wieder freigegebenen)
+            # Lock von handle_key() zu verlassen.
+            with self._render_lock:
+                self._set_key_image(key_index, normal_img)
+                self.device.end_batch()
 
         threading.Thread(target=_restore, daemon=True).start()
 
@@ -269,54 +287,55 @@ class DeckOneController:
     def handle_key(self, key_index: int, pressed: bool) -> None:
         if not pressed:
             return
-        if self.active_profile == "radar":
-            if key_index == radar.GRID_COLS * radar.GRID_ROWS - 1:  # unten rechts = manueller Zoom
-                self._radar_zoom_idx = (self._radar_zoom_idx + 1) % len(radar.ZOOM_CYCLE)
-                self.render_current_page()
+        with self._render_lock:
+            if self.active_profile == "radar":
+                if key_index == radar.GRID_COLS * radar.GRID_ROWS - 1:  # unten rechts = manueller Zoom
+                    self._radar_zoom_idx = (self._radar_zoom_idx + 1) % len(radar.ZOOM_CYCLE)
+                    self.render_current_page()
+                    return
+                if self._radar_info is not None and self._radar_info[0] == key_index:
+                    # Erneuter Druck auf dieselbe Kachel: Info wieder ausblenden.
+                    self._radar_info = None
+                    self.render_current_page()
+                    return
+                if self._radar_frame is not None:
+                    ac = radar.aircraft_at(self._radar_frame, key_index)
+                    if ac is not None:
+                        self._radar_info = (key_index, ac, time.monotonic() + 20.0)
+                        card = radar.render_info_card(ac, radar.tile_image(self._radar_frame, key_index))
+                        self._set_key_image(key_index, card)
+                        self.device.end_batch()
                 return
-            if self._radar_info is not None and self._radar_info[0] == key_index:
-                # Erneuter Druck auf dieselbe Kachel: Info wieder ausblenden.
-                self._radar_info = None
-                self.render_current_page()
+            key = self._current_page_keys().get(key_index)
+            if key is None:
                 return
-            if self._radar_frame is not None:
-                ac = radar.aircraft_at(self._radar_frame, key_index)
-                if ac is not None:
-                    self._radar_info = (key_index, ac, time.monotonic() + 20.0)
-                    card = radar.render_info_card(ac, radar.tile_image(self._radar_frame, key_index))
-                    self._set_key_image(key_index, card)
-                    self.device.end_batch()
-            return
-        key = self._current_page_keys().get(key_index)
-        if key is None:
-            return
-        action = key.get("action", {})
-        action_type = action.get("type")
-        logger.info(
-            "DECK ONE Taste %s gedrueckt: %s (%s)",
-            key_index, key.get("title") or key.get("name"), action_type,
-        )
-        self._flash_key_press(key_index, key, action_type)
-        if action_type == "page_next":
-            self._switch_page(+1)
-        elif action_type == "page_previous":
-            self._switch_page(-1)
-        elif action_type == "live_stat":
-            self.render_current_page()  # manuelles Sofort-Auffrischen bei Druck
-            metric = action.get("metric", "")
-            if metric in ("cpu", "ram", "gpu_load"):
-                # Top-5-Prozesse-Popup nur fuer die drei Prozent-Kacheln (siehe
-                # process_monitor.py) - laeuft in einem eigenen Thread, da die
-                # CPU-Messung ~0.6s braucht und das sonst die Tastenverarbeitung
-                # dieses Geraets blockieren wuerde (gleiche Lehre wie beim
-                # Screenshot-Fix in actions.py).
-                process_monitor.show_top_processes_async(metric)
-        elif action_type == "timer":
-            duration_min = float(action.get("duration_min", 25))
-            timer_engine.handle_press(self._timer_key_id(key_index), duration_min, action.get("sound"))
-            self.render_current_page()  # manuelles Sofort-Auffrischen bei Druck, wie live_stat
-        elif action_type == "live_view_toggle":
-            live_view.toggle_enabled_flag()  # eigentliches Starten/Stoppen macht die Haupt-Loop (daemon.py)
-            self.render_current_page()
-        else:
-            actions.dispatch(action, key.get("title") or key.get("name", ""))
+            action = key.get("action", {})
+            action_type = action.get("type")
+            logger.info(
+                "DECK ONE Taste %s gedrueckt: %s (%s)",
+                key_index, key.get("title") or key.get("name"), action_type,
+            )
+            self._flash_key_press(key_index, key, action_type)
+            if action_type == "page_next":
+                self._switch_page(+1)
+            elif action_type == "page_previous":
+                self._switch_page(-1)
+            elif action_type == "live_stat":
+                self.render_current_page()  # manuelles Sofort-Auffrischen bei Druck
+                metric = action.get("metric", "")
+                if metric in ("cpu", "ram", "gpu_load"):
+                    # Top-5-Prozesse-Popup nur fuer die drei Prozent-Kacheln (siehe
+                    # process_monitor.py) - laeuft in einem eigenen Thread, da die
+                    # CPU-Messung ~0.6s braucht und das sonst die Tastenverarbeitung
+                    # dieses Geraets blockieren wuerde (gleiche Lehre wie beim
+                    # Screenshot-Fix in actions.py).
+                    process_monitor.show_top_processes_async(metric)
+            elif action_type == "timer":
+                duration_min = float(action.get("duration_min", 25))
+                timer_engine.handle_press(self._timer_key_id(key_index), duration_min, action.get("sound"))
+                self.render_current_page()  # manuelles Sofort-Auffrischen bei Druck, wie live_stat
+            elif action_type == "live_view_toggle":
+                live_view.toggle_enabled_flag()  # eigentliches Starten/Stoppen macht die Haupt-Loop (daemon.py)
+                self.render_current_page()
+            else:
+                actions.dispatch(action, key.get("title") or key.get("name", ""))
