@@ -12,9 +12,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # Bewusst NICHT die volle requirements.txt (hidapi/pyusb brauchen
-      # System-Bibliotheken, die auf einem nackten CI-Runner ohne
-      # Extra-Schritte nicht da sind, und werden von den getesteten Modulen
-      # gar nicht importiert - siehe tests/README.md).
-      - run: pip install Pillow requests PyYAML pytest
+      # Volle requirements.txt statt einer Minimal-Liste: hidapi/pyusb
+      # installieren auf ubuntu-latest problemlos ueber vorkompilierte Wheels
+      # (verifiziert), und ein zweites, unabhaengiges Set haette genau das
+      # Risiko, das den allerersten CI-Lauf hier gebrochen hat (ein Modul
+      # importierte transitiv psutil/pyusb, die nicht in der Minimal-Liste
+      # standen - siehe Commit-Historie).
+      - run: pip install -r requirements.txt pytest
       - run: pytest -v

@@ -281,7 +281,7 @@ exactly doesn't work, and log output if possible. For the parts marked
 experimental (macOS, other Elgato models) especially, real feedback is
 the only way to harden them.
 
-There's an automated test suite (`pip install -r requirements-dev.txt && pytest`,
+There's an automated test suite (`pip install -r requirements.txt -r requirements-dev.txt && pytest`,
 runs on every push via GitHub Actions) covering the pure logic — tile
 geometry, zoom math, the timer state machine. It intentionally doesn't
 (and can't) cover anything needing real hardware or a live Home Assistant

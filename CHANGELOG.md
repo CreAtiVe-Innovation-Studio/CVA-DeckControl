@@ -2,6 +2,21 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.0] - 2026-09-06
+
+### Added
+- `action_long`: an optional second action on any key, triggered when the
+  key is held past 0.6s instead of the normal `action`. Keys now fire on
+  release rather than press so short vs. long can be distinguished — no
+  visible difference for a normal tap. Doesn't apply to the procedurally
+  rendered special pages (radar/weather-map/location-map), which keep their
+  original press-only behavior.
+- CI now installs the full `requirements.txt` instead of a hand-picked
+  minimal set, after discovering `deckone_controller.py` transitively needs
+  `psutil`/`pyusb`/`hidapi` to even import (verified: these install cleanly
+  from prebuilt wheels on `ubuntu-latest`, no system dev-libraries needed
+  just to import them).
+
 ## [1.3.1] - 2026-09-06
 
 ### Fixed

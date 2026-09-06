@@ -290,7 +290,7 @@ Plattform, was genau nicht funktioniert, und wenn möglich die Log-Ausgabe.
 Besonders für die als experimentell markierten Stellen (macOS, andere
 Elgato-Modelle) ist echtes Feedback der einzige Weg, die abzusichern.
 
-Es gibt eine automatisierte Testsuite (`pip install -r requirements-dev.txt && pytest`,
+Es gibt eine automatisierte Testsuite (`pip install -r requirements.txt -r requirements-dev.txt && pytest`,
 läuft bei jedem Push über GitHub Actions) für die reine Logik — Kachel-
 Geometrie, Zoom-Berechnungen, den Timer-Zustandsautomaten. Deckt bewusst
 NICHT ab (und kann es auch nicht), was echte Hardware oder eine laufende

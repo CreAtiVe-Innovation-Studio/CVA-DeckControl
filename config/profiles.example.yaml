@@ -106,6 +106,9 @@ deckone:
             title: Einstellungen
             action:
               type: open_gui
+            action_long:    # optional - siehe SEITEN-LOGIK.md Abschnitt 4.12
+              type: website
+              url: https://example.com
             icon:
               type: generated
           8:

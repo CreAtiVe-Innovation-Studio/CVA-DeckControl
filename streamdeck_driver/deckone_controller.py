@@ -17,6 +17,11 @@ from .icon_render import (
 )
 
 FLASH_DURATION_S = 0.13
+# Ab dieser Haltedauer (Sekunden zwischen Druecken und Loslassen) gilt ein
+# Tastendruck als "lang" - loest dann `action_long` statt `action` aus, falls
+# die Taste ein action_long definiert hat (siehe handle_key()). 0.6s ist ein
+# ueblicher Standardwert fuer lang/kurz-Unterscheidung bei Tasten/Touch.
+LONG_PRESS_THRESHOLD_S = 0.6
 
 logger = logging.getLogger("streamdeck_driver.deckone_controller")
 
@@ -45,6 +50,7 @@ class DeckOneController:
         self._forecast_idx = 0
         self._location_frame: location_map.LocationFrame | None = None
         self._location_info: tuple[int, location_map.TrackedPoint, float] | None = None
+        self._press_started: dict[int, float] = {}  # key_index -> time.monotonic() bei Tastendruck
         # Schuetzt jede Sequenz aus set_key_image()-Aufrufen + end_batch() als
         # EINE atomare Einheit - ohne das koennen der 3s-Hintergrund-Refresh
         # (start_stat_refresh) und ein zeitgleicher Tastendruck/Profilwechsel
@@ -374,9 +380,9 @@ class DeckOneController:
     # -- Tastendruck ----------------------------------------------------------
 
     def handle_key(self, key_index: int, pressed: bool) -> None:
-        if not pressed:
-            return
         with self._render_lock:
+            if self.active_profile in ("radar", "wetter_vorhersage", "wo_ist") and not pressed:
+                return
             if self.active_profile == "radar":
                 if key_index == radar.GRID_COLS * radar.GRID_ROWS - 1:  # unten rechts = manueller Zoom
                     self._radar_zoom_idx = (self._radar_zoom_idx + 1) % len(radar.ZOOM_CYCLE)
@@ -417,14 +423,30 @@ class DeckOneController:
                 return
             key = self._current_page_keys().get(key_index)
             if key is None:
+                self._press_started.pop(key_index, None)
                 return
-            action = key.get("action", {})
+
+            if pressed:
+                # Aktion wird erst beim Loslassen ausgeloest (siehe unten) -
+                # nur so laesst sich ueberhaupt unterscheiden, ob es am Ende
+                # ein kurzer oder langer Druck war. Der Zoom-Puls als
+                # sofortiges taktiles Feedback bleibt trotzdem auf dem
+                # Tastendruck selbst, nicht auf dem Loslassen.
+                self._press_started[key_index] = time.monotonic()
+                self._flash_key_press(key_index, key, key.get("action", {}).get("type"))
+                return
+
+            started = self._press_started.pop(key_index, None)
+            held_s = (time.monotonic() - started) if started is not None else 0.0
+            action_long = key.get("action_long")
+            is_long_press = held_s >= LONG_PRESS_THRESHOLD_S and action_long
+            action = action_long if is_long_press else key.get("action", {})
             action_type = action.get("type")
             logger.info(
-                "DECK ONE Taste %s gedrueckt: %s (%s)",
-                key_index, key.get("title") or key.get("name"), action_type,
+                "DECK ONE Taste %s losgelassen (%.2fs gehalten, %s): %s (%s)",
+                key_index, held_s, "lang" if is_long_press else "kurz",
+                key.get("title") or key.get("name"), action_type,
             )
-            self._flash_key_press(key_index, key, action_type)
             if action_type == "page_next":
                 self._switch_page(+1)
             elif action_type == "page_previous":
