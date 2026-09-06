@@ -2,6 +2,15 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.1] - 2026-09-06
+
+### Fixed
+- Radar avatar false-positive "rain" event: RainViewer tiles are fetched with
+  smoothing enabled, which creates a soft alpha halo (~41-62/255) around real
+  precipitation areas. The old detection threshold (30) was catching that
+  halo as rain even with no actual precipitation nearby. Raised to 110,
+  verified live against real (non-raining) data.
+
 ## [1.3.0] - 2026-09-06
 
 ### Added

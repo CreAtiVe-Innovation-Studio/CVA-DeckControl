@@ -215,8 +215,17 @@ def _rainviewer_nowcast_frames() -> list[dict]:
     return [{"time": f["time"], "path": host + f["path"]} for f in data.get("radar", {}).get("nowcast", [])]
 
 
+# BUG GEFUNDEN 2026-09-06 (live gemeldet: Avatar zeigte "Regen" ohne
+# sichtbare Regenwolke): 30 war zu niedrig - die RainViewer-Kachel wird mit
+# Glaettung geholt (siehe _fetch_precip_tile, ".../2/1_1.png" - das "1_1"
+# aktiviert einen weichen Alpha-Verlauf/Blur um echte Niederschlagsflaechen
+# herum). Bei Zuhause direkt gemessen waehrend es NICHT geregnet hat: Alpha
+# 41-62 in einer 11x11-Pixel-Umgebung, konsistent (kein Einzelpixel-Rauschen,
+# sondern genau dieser Weichzeichner-Schleier). Echter, sichtbarer Regen
+# rendert in diesem Farbschema deutlich kraeftiger. Schwelle entsprechend
+# angehoben, um den Schleier auszuschliessen, ohne echten Regen zu verpassen.
 RAIN_AVATAR_ZOOM = 7  # = MAX_PRECIP_ZOOM, gleiche Aufloesung wie die Kartenebene
-RAIN_AVATAR_ALPHA_THRESHOLD = 30  # von 255 - filtert Rand-Rauschen, nicht jeden einzelnen Pixel
+RAIN_AVATAR_ALPHA_THRESHOLD = 110  # von 255
 
 
 def _is_raining_at_home() -> bool:
