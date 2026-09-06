@@ -7,3 +7,10 @@
 # unveraendert laufen laesst und denkt, es zeigt echte Daten.
 home_lat: 0.0
 home_lon: 0.0
+
+# Optional - welche Home-Assistant weather.*-Entity fuer Wind/"klarer
+# Himmel"-Erkennung im Radar-Avatar genutzt wird (siehe radar.py::_wind_info()/
+# _weather_condition()). Faellt auf 'weather.home' zurueck, falls hier nicht
+# gesetzt - das ist der Name, den viele HA-Wetterintegrationen standardmaessig
+# verwenden, aber pruefe deine eigene Entity-ID unter Entwicklertools > Zustaende.
+weather_entity_id: weather.home

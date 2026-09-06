@@ -36,25 +36,32 @@ from .paths import app_root, project_root
 logger = logging.getLogger("streamdeck_driver.radar")
 
 
-def _load_home_location() -> tuple[float, float]:
-    """Lokaler Standort fuer die Radar-Seite kommt aus config/location.yaml
+def _load_home_location() -> tuple[float, float, str]:
+    """Lokaler Standort (+ die Wetter-Entity fuer Wind/Klarer-Himmel-Check,
+    siehe _wind_info()/_weather_condition()) kommt aus config/location.yaml
     (siehe location.example.yaml als Vorlage) statt hart im Code zu stehen -
-    sonst wuerde die echte Adresse in einem oeffentlichen Repo landen. Faellt
-    auf 0,0 zurueck (nur eine Warnung, kein Absturz) falls die Datei fehlt,
-    damit der Rest des Treibers (Hotkeys etc.) auch ohne Radar-Setup startet."""
+    sonst wuerde die echte Adresse (bzw. der eigene HA-Entity-Name) in einem
+    oeffentlichen Repo landen. weather_entity_id faellt auf den generischen
+    HA-Standardnamen 'weather.home' zurueck, falls nicht gesetzt. Faellt bei
+    fehlender Datei auf 0,0 zurueck (nur eine Warnung, kein Absturz), damit
+    der Rest des Treibers (Hotkeys etc.) auch ohne Radar-Setup startet."""
     path = app_root() / "config" / "location.yaml"
     if not path.exists():
         logger.warning(
             "%s fehlt - Radar-Seite nutzt Platzhalter-Koordinaten (0,0). Vorlage kopieren: "
             "cp config/location.example.yaml config/location.yaml", path,
         )
-        return 0.0, 0.0
+        return 0.0, 0.0, "weather.home"
     with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    return float(data.get("home_lat", 0.0)), float(data.get("home_lon", 0.0))
+    return (
+        float(data.get("home_lat", 0.0)),
+        float(data.get("home_lon", 0.0)),
+        data.get("weather_entity_id", "weather.home"),
+    )
 
 
-HOME_LAT, HOME_LON = _load_home_location()
+HOME_LAT, HOME_LON, WEATHER_ENTITY_ID = _load_home_location()
 CGN = (50.8659, 7.1427)  # Koeln/Bonn - oeffentliche Flughafenkoordinate, keine private Adresse
 DUS = (51.2895, 6.7668)  # Duesseldorf
 
@@ -790,7 +797,7 @@ def build_forecast_frame(nowcast_index: int = 0) -> RadarFrame:
 def _wind_info() -> tuple[float, float] | None:
     """(Richtung woher der Wind kommt in Grad, Geschwindigkeit in km/h) aus
     der Wetter-Entity - None falls (noch) nicht verfuegbar."""
-    state = ha_client.get_state("weather.forecast_home_3")
+    state = ha_client.get_state(WEATHER_ENTITY_ID)
     if state is None:
         return None
     attrs = state.get("attributes", {})
@@ -865,7 +872,7 @@ GOV_CALLSIGN_PREFIXES = ("GAF",)  # Luftwaffe/Flugbereitschaft des Bundes
 
 
 def _weather_condition() -> str | None:
-    state = ha_client.get_state("weather.forecast_home_3")
+    state = ha_client.get_state(WEATHER_ENTITY_ID)
     return state.get("state") if state else None
 
 

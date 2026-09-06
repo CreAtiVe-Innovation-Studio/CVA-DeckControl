@@ -2,6 +2,18 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.1] - 2026-09-06
+
+**Not yet extensively tested** — behavior-preserving refactor, checked
+against the live values it replaces, but not soaked over time.
+
+### Changed
+- `radar.py`'s wind/"clear sky" detection had a Home Assistant weather
+  entity ID hardcoded in the source instead of externalized like the home
+  coordinates. Moved to `config/location.yaml`'s new optional
+  `weather_entity_id` field (falls back to the generic `weather.home` if
+  not set).
+
 ## [1.2.0] - 2026-09-06
 
 ### Added
