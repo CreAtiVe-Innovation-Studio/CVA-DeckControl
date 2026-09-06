@@ -19,7 +19,7 @@ from pathlib import Path
 
 import yaml
 
-from . import actions, live_view, timer_engine
+from . import actions, live_view, timer_engine, update_check
 from .deckone_controller import DeckOneController
 from .devices.elgato_mini import ElgatoMini
 from .icon_render import blank_icon, render_key_icon, zoom_icon
@@ -212,6 +212,7 @@ def main() -> None:
     if sys.stderr is not None:
         handlers.append(logging.StreamHandler())
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", handlers=handlers)
+    update_check.check_in_background()
     config = load_config()
     UnifiedDaemon(config).run()
 

@@ -99,6 +99,16 @@
   .nav-btn.danger:hover { background: rgba(248,113,113,0.2); color: #ffb4b0; }
 
   .main { padding: 26px 34px 60px; min-width: 0; height: 100vh; overflow-y: auto; }
+  .update-banner {
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, rgba(52,211,153,0.16), rgba(56,189,248,0.10));
+    border: 1px solid rgba(52,211,153,0.35); border-radius: var(--radius-sm);
+    padding: 10px 14px; margin-bottom: 16px; font-size: 13px;
+  }
+  .update-banner a { color: var(--accent3); font-weight: 600; text-decoration: none; }
+  .update-banner a:hover { text-decoration: underline; }
+  .update-banner-close { margin-left: auto; cursor: pointer; color: var(--text-dim); font-size: 16px; line-height: 1; padding: 0 4px; }
+  .update-banner-close:hover { color: var(--text); }
   .topbar {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 22px; gap: 16px; flex-wrap: wrap;
@@ -261,6 +271,11 @@
   </aside>
 
   <main class="main">
+    <div class="update-banner" id="update-banner" style="display:none">
+      <span id="update-banner-text"></span>
+      <a id="update-banner-link" href="#" target="_blank" rel="noopener">Ansehen</a>
+      <span class="update-banner-close" id="update-banner-close">&times;</span>
+    </div>
     <div class="topbar">
       <div class="crumbs" id="crumbs">Waehle eine Seite links aus</div>
       <div class="actions">
@@ -842,6 +857,22 @@ document.getElementById("btn-restart").addEventListener("click", async () => {
 });
 
 loadAll().catch(e => toast("Laden fehlgeschlagen: " + e.message, "err"));
+
+async function checkForUpdate() {
+  try {
+    const r = await api("/api/update-check");
+    if (!r.update_available) return;
+    document.getElementById("update-banner-text").textContent =
+      `Update verfuegbar: ${r.current} -> ${r.latest}`;
+    const link = document.getElementById("update-banner-link");
+    link.href = r.url || "#";
+    document.getElementById("update-banner").style.display = "flex";
+  } catch (e) { /* Update-Check ist rein informativ, Fehler hier egal */ }
+}
+document.getElementById("update-banner-close").addEventListener("click", () => {
+  document.getElementById("update-banner").style.display = "none";
+});
+checkForUpdate();
 </script>
 </body>
 </html>

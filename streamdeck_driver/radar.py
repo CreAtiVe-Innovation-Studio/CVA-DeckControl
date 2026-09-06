@@ -29,6 +29,7 @@ import yaml
 from PIL import Image, ImageDraw, ImageOps
 
 from . import ha_client
+from .grid import DECKONE_GRID
 from .icon_render import _load_font
 from .paths import app_root, project_root
 
@@ -57,16 +58,17 @@ HOME_LAT, HOME_LON = _load_home_location()
 CGN = (50.8659, 7.1427)  # Koeln/Bonn - oeffentliche Flughafenkoordinate, keine private Adresse
 DUS = (51.2895, 6.7668)  # Duesseldorf
 
-GRID_COLS, GRID_ROWS = 5, 3
-TILE_PX = 100
-# Zwischen den physischen Tasten sitzt ein Rahmen/Steg (Bezel) - ohne Luecken-
-# Korrektur wuerde eine Strasse/Flugbahn, die ueber zwei Tasten laeuft, an der
-# Kante springen statt weiterzulaufen. Nachgemessen: Taste 1,3cm, Luecke
-# 0,9cm -> GAP_PX = TILE_PX * 0.9/1.3.
-GAP_PX = round(TILE_PX * 0.9 / 1.3)
-CANVAS_W, CANVAS_H = GRID_COLS * TILE_PX, GRID_ROWS * TILE_PX  # 500x300 - SICHTBARE Flaeche
-EFFECTIVE_W = CANVAS_W + (GRID_COLS - 1) * GAP_PX  # inkl. der "verdeckten" Luecken-Pixel
-EFFECTIVE_H = CANVAS_H + (GRID_ROWS - 1) * GAP_PX
+# Grid-Geometrie jetzt aus dem geteilten grid.py-Modul bezogen (siehe dort) -
+# gleiche Zahlen wie vorher, nur nicht mehr lose Modul-Konstanten, damit
+# andere Features (z.B. eine Standort-Karte) dieselbe Logik fuer andere
+# Geraete-Grids wiederverwenden koennen. GAP_PX-Herleitung (nachgemessen:
+# Taste 1,3cm, Luecke 0,9cm) steckt jetzt in Grid.__post_init__.
+GRID = DECKONE_GRID
+GRID_COLS, GRID_ROWS = GRID.cols, GRID.rows
+TILE_PX = GRID.tile_px
+GAP_PX = GRID.gap_px
+CANVAS_W, CANVAS_H = GRID.canvas_w, GRID.canvas_h  # 500x300 - SICHTBARE Flaeche
+EFFECTIVE_W, EFFECTIVE_H = GRID.effective_w, GRID.effective_h  # inkl. der "verdeckten" Luecken-Pixel
 TILE_SIZE = 256  # OSM-Kachelgroesse
 
 DEFAULT_RADIUS_KM = 5.0  # Ausgangssicht/Ruhezustand
@@ -334,8 +336,9 @@ def _project(lat: float, lon: float, zoom: int, center_px: tuple[float, float]) 
 
 def _cell_origin(col: int, row: int) -> tuple[int, int]:
     """Obere linke Ecke der sichtbaren TILE_PXxTILE_PX-Flaeche fuer (col,row)
-    im EFFECTIVE-Bild - jede Zelle wird durch GAP_PX vom Nachbarn getrennt."""
-    return col * (TILE_PX + GAP_PX), row * (TILE_PX + GAP_PX)
+    im EFFECTIVE-Bild - jede Zelle wird durch GAP_PX vom Nachbarn getrennt.
+    Duenner Wrapper um Grid.cell_origin() (siehe grid.py)."""
+    return GRID.cell_origin(col, row)
 
 
 # -- Flugzeuge (adsb.lol) -----------------------------------------------------
@@ -927,15 +930,9 @@ def _draw_outlined_text(draw: ImageDraw.ImageDraw, pos: tuple[float, float], tex
 def slice_tiles(frame: RadarFrame) -> dict[int, Image.Image]:
     """Zerschneidet in DECK-ONE-Reihenfolge (row-major, Index 0-14) - ueber-
     springt dabei die GAP_PX-Luecken zwischen den Zellen (siehe _cell_origin),
-    damit Inhalte ueber die physischen Tastenraender hinweg weiterlaufen."""
-    tiles = {}
-    for row in range(GRID_ROWS):
-        for col in range(GRID_COLS):
-            idx = row * GRID_COLS + col
-            x0, y0 = _cell_origin(col, row)
-            box = (x0, y0, x0 + TILE_PX, y0 + TILE_PX)
-            tiles[idx] = frame.image.crop(box)
-    return tiles
+    damit Inhalte ueber die physischen Tastenraender hinweg weiterlaufen.
+    Duenner Wrapper um Grid.slice_tiles() (siehe grid.py)."""
+    return GRID.slice_tiles(frame.image)
 
 
 def aircraft_at(frame: RadarFrame, key_index: int) -> dict | None:

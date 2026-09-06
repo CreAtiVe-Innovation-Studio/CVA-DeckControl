@@ -1,6 +1,6 @@
 # CVA-DeckControl
 
-**Read this in other languages:** 🇩🇪 [Deutsch](docs/README_DE.md)
+**Read this in other languages:** 🇩🇪 [Deutsch](docs/README_DE.md) · [Changelog](CHANGELOG.md)
 
 Self-built driver with openly viewable source (source-available, see
 "License" below) for the **Elgato Stream Deck Mini** and the **Streamplify
@@ -28,6 +28,10 @@ was simply fun to talk to the hardware directly.
   what's currently on the real hardware)
 - **Import/export** for Elgato/Streamplify profiles AND for its own YAML
   format, to share setups with others
+- **Location map ("Where is?")**: same one-big-image-cut-into-tiles idea as
+  the radar, showing tracked people via Home Assistant (`person`/
+  `device_tracker` entities) with auto-fit zoom — tested, but not
+  extensively (see the dedicated section below)
 - Action types: hotkeys, launching programs/URLs, per-app volume, live
   system metrics (CPU/RAM/GPU), Home Assistant control, and more — full
   list in [SEITEN-LOGIK.md](SEITEN-LOGIK.md) (German, technical reference)
@@ -170,6 +174,38 @@ currently German-only.
 
 Unknown actions land as `needs_review`/`unmapped` instead of crashing or
 being guessed at — clean them up afterward in the Settings GUI.
+
+## Location map ("Where is?")
+
+**Tested, but not extensively** — the rendering/zoom logic has been checked
+against simulated tracker data, but not against a real long-running
+tracking setup over days/weeks. If something looks off (wrong zoom, a pin
+in the wrong spot, a crash), please open an issue.
+
+A separate profile, built the same way as the radar (one big map image cut
+into tiles), that shows where tracked people currently are, auto-zoomed so
+everyone (and home) stays visible. It deliberately does **not** talk to
+Apple Find My or WhatsApp directly — neither has a stable API to build
+against (Find My only has unofficial, easily-broken wrappers; WhatsApp's
+live location has no API at all). Instead it reads whatever Home Assistant
+already exposes as `person`/`device_tracker` entities, so any source HA
+supports works: the official HA Companion App's own GPS, Life360, or the
+community [iCloud3](https://github.com/gcobb321/icloud3) integration for
+Apple Find My.
+
+**Setup:**
+1. Get at least one `person.*` or `device_tracker.*` entity with GPS
+   coordinates into Home Assistant (any integration works, see above).
+2. `config/ha_secrets.yaml` must be filled in (see FAQ above) — same
+   credentials used for the other Home Assistant features.
+3. Switch to the `wo_ist` profile (add a `switch_profile` key somewhere,
+   see [SEITEN-LOGIK.md](SEITEN-LOGIK.md) for the general pattern).
+
+`person.*` entities are preferred (they carry a proper display name);
+`device_tracker.*` is used as a fallback if no `person` has coordinates.
+Without any tracker configured, the page shows a "no trackers found" card
+instead of an empty or broken map. Press a pin's key to see the tracked
+person's name/distance/direction from home; press again to hide it.
 
 ## Platform support
 

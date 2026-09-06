@@ -1,6 +1,6 @@
 # CVA-DeckControl
 
-**In anderen Sprachen lesen:** 🇬🇧 [English](../README.md)
+**In anderen Sprachen lesen:** 🇬🇧 [English](../README.md) · [Changelog](../CHANGELOG.md)
 
 Selbstgebauter Treiber mit offen einsehbarem Quellcode (Source-Available,
 siehe "Lizenz" unten) für den **Elgato Stream Deck Mini** und die
@@ -29,6 +29,10 @@ einfach Spaß gemacht hat, die Hardware selbst anzusprechen.
   gerade auf der echten Hardware zu sehen ist)
 - **Import/Export** für Elgato-/Streamplify-Profile UND fürs eigene
   YAML-Format, um Setups mit anderen zu teilen
+- **Standort-Karte ("Wo ist?")**: gleiches Prinzip wie das Radar (ein großes
+  Kartenbild in Kacheln zerschnitten), zeigt getrackte Personen über Home
+  Assistant mit automatischer Zoom-Anpassung — getestet, aber nicht
+  ausgiebig (siehe eigener Abschnitt unten)
 - Aktionstypen: Hotkeys, Programme/URLs öffnen, App-Lautstärke, Live-System-
   Kennzahlen (CPU/RAM/GPU), Home-Assistant-Steuerung, uvm. — volle Liste in
   [SEITEN-LOGIK.md](../SEITEN-LOGIK.md)
@@ -174,6 +178,42 @@ jede Angabe ist gegen den echten Code verifiziert, keine Vermutungen.
 
 Unbekannte Aktionen landen als `needs_review`/`unmapped` statt zu crashen
 oder geraten zu werden — danach in der Settings-GUI nachbearbeiten.
+
+## Standort-Karte ("Wo ist?")
+
+**Getestet, aber nicht ausgiebig** — die Render-/Zoom-Logik wurde gegen
+simulierte Tracker-Daten geprüft, aber nicht gegen ein echtes, über Tage/
+Wochen laufendes Tracking-Setup. Falls etwas komisch aussieht (falscher
+Zoom, Pin an falscher Stelle, Absturz) bitte ein Issue aufmachen.
+
+Ein eigenes Profil, nach demselben Prinzip wie das Radar gebaut (ein großes
+Kartenbild in Kacheln zerschnitten), das zeigt wo getrackte Personen gerade
+sind, automatisch so gezoomt dass alle (und zuhause) sichtbar bleiben. Es
+spricht bewusst **nicht** direkt mit Apple Find My oder WhatsApp — für
+keins von beiden gibt es eine stabile API zum Draufbauen (Find My hat nur
+inoffizielle, leicht brechende Wrapper; WhatsApps Live-Standort hat gar
+keine API). Stattdessen liest es, was Home Assistant bereits als
+`person`/`device_tracker`-Entities bereitstellt — jede Quelle, die HA
+unterstützt, funktioniert also: die eigene GPS-Position über die
+HA-Companion-App, Life360, oder die Community-Integration
+[iCloud3](https://github.com/gcobb321/icloud3) für Apple Find My.
+
+**Einrichtung:**
+1. Mindestens eine `person.*`- oder `device_tracker.*`-Entity mit
+   GPS-Koordinaten in Home Assistant einrichten (jede Integration geht,
+   siehe oben).
+2. `config/ha_secrets.yaml` muss ausgefüllt sein (siehe FAQ oben) —
+   dieselben Zugangsdaten wie für die anderen Home-Assistant-Features.
+3. Zum `wo_ist`-Profil wechseln (irgendwo eine `switch_profile`-Taste dafür
+   anlegen, siehe [SEITEN-LOGIK.md](../SEITEN-LOGIK.md) fürs allgemeine
+   Muster).
+
+`person.*`-Entities werden bevorzugt (haben einen richtigen Anzeigenamen);
+`device_tracker.*` ist der Rückfallpunkt, falls keine `person`-Entity
+Koordinaten hat. Ohne eingerichteten Tracker zeigt die Seite eine
+"Keine Tracker gefunden"-Karte statt einer leeren oder kaputten Karte. Eine
+Pin-Taste antippen zeigt Name/Entfernung/Richtung von zuhause; nochmal
+antippen blendet es wieder aus.
 
 ## Plattform-Unterstützung
 

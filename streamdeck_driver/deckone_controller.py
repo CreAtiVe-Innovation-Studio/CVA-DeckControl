@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 
-from . import actions, ha_client, hw_monitor, live_view, process_monitor, radar, timer_engine
+from . import actions, ha_client, hw_monitor, live_view, location_map, process_monitor, radar, timer_engine
 from .devices.deckone import DeckOne
 from .icon_render import blank_icon, render_key_icon, render_stat_card, render_timer_card, render_toggle_card, zoom_icon
 
@@ -38,17 +38,17 @@ class DeckOneController:
         self._radar_frame: radar.RadarFrame | None = None
         self._radar_zoom_idx = 0
         self._radar_info: tuple[int, dict, float] | None = None  # (key_index, aircraft, expires_at)
+        self._location_frame: location_map.LocationFrame | None = None
+        self._location_info: tuple[int, location_map.TrackedPoint, float] | None = None
         # Schuetzt jede Sequenz aus set_key_image()-Aufrufen + end_batch() als
         # EINE atomare Einheit - ohne das koennen der 3s-Hintergrund-Refresh
         # (start_stat_refresh) und ein zeitgleicher Tastendruck/Profilwechsel
         # (vom Elgato-Mini-Event-Thread) ihre Bild-Uploads auf demselben
         # USB-Geraet verschachteln, was zu sichtbar korrupten/gemischten
         # Kacheln fuehrt (live gemeldet: "halb grau halb Bild", alte Kachel
-        # bleibt nach Profilwechsel stehen; per Stresstest mit einem Fake-
-        # Geraet reproduziert: 15 von 90 Batches vermischt ohne den Lock,
-        # 0 von 90 mit ihm). RLock, da verschachtelte Aufrufe im selben
-        # Thread vorkommen (render_current_page -> _render_radar_page ->
-        # _apply_radar_info_overlay).
+        # bleibt nach Profilwechsel stehen). RLock, da verschachtelte Aufrufe
+        # im selben Thread vorkommen (z.B. render_current_page -> _render_
+        # radar_page -> _apply_radar_info_overlay).
         self._render_lock = threading.RLock()
 
     @property
@@ -88,6 +88,9 @@ class DeckOneController:
             if self.active_profile == "radar":
                 self._render_radar_page()
                 return
+            if self.active_profile == "wo_ist":
+                self._render_location_page()
+                return
             keys = self._current_page_keys()
             size = self.device.info.image_size
             stats = hw_monitor.snapshot() if self.active_profile in ("system", "ki") else None
@@ -117,6 +120,42 @@ class DeckOneController:
         self._apply_radar_info_overlay()
         self.device.end_batch()
         logger.info("DECK ONE: Radar-Seite gerendert (warning=%s)", frame.warning)
+
+    def _render_location_page(self) -> None:
+        """Sonderfall wie _render_radar_page(): 'Wo ist?'-Seite wird als EIN
+        grosses Kartenbild komponiert (siehe location_map.py), nicht aus der
+        YAML gerendert. Ohne konfigurierte HA-Tracker-Entities zeigt sie
+        einen Platzhalter statt leer/kaputt zu bleiben."""
+        try:
+            points = location_map._fetch_tracked_points()
+            if not points:
+                self._location_frame = None
+                tiles = location_map.render_placeholder()
+            else:
+                frame = location_map.build_frame()
+                self._location_frame = frame
+                tiles = location_map.slice_tiles(frame)
+        except Exception:
+            logger.exception("Standort-Karte-Rendering fehlgeschlagen")
+            return
+        for idx, tile in tiles.items():
+            ok = self._set_key_image(idx, tile)
+            if not ok:
+                logger.warning("DECK ONE Taste %s (Wo-ist): Bild setzen fehlgeschlagen", idx)
+        self._apply_location_info_overlay()
+        self.device.end_batch()
+        logger.info("DECK ONE: Wo-ist-Seite gerendert (%s Tracker)", len(points))
+
+    def _apply_location_info_overlay(self) -> None:
+        if self._location_info is None:
+            return
+        key_index, point, expires_at = self._location_info
+        if time.monotonic() >= expires_at:
+            self._location_info = None
+            return
+        base_tile = location_map.tile_image(self._location_frame, key_index) if self._location_frame else blank_icon(self.device.info.image_size)
+        card = location_map.render_info_card(point, base_tile)
+        self._set_key_image(key_index, card)
 
     def _apply_radar_info_overlay(self) -> None:
         """Zeigt bei angetippter Flugzeug-Kachel deren Detail-Karte an,
@@ -205,7 +244,7 @@ class DeckOneController:
 
         def _restore():
             time.sleep(FLASH_DURATION_S)
-            # Laeuft in einem eigenen Thread, lange NACHDEM der urspruengliche
+            # Laeuft in einem eigenen Thread, lange NACH dem urspruenglichen
             # handle_key()-Aufruf zurueckgekehrt ist - braucht deshalb sein
             # eigenes Lock statt sich auf den (laengst wieder freigegebenen)
             # Lock von handle_key() zu verlassen.
@@ -251,7 +290,7 @@ class DeckOneController:
 
         def _run():
             while not self._refresh_stop.wait(SYSTEM_REFRESH_INTERVAL_S):
-                if self.active_profile in ("system", "ki", "home", "radar", "timer") and self.device.connected:
+                if self.active_profile in ("system", "ki", "home", "radar", "timer", "wo_ist") and self.device.connected:
                     try:
                         self.render_current_page()
                     except Exception:
@@ -303,6 +342,19 @@ class DeckOneController:
                     if ac is not None:
                         self._radar_info = (key_index, ac, time.monotonic() + 20.0)
                         card = radar.render_info_card(ac, radar.tile_image(self._radar_frame, key_index))
+                        self._set_key_image(key_index, card)
+                        self.device.end_batch()
+                return
+            if self.active_profile == "wo_ist":
+                if self._location_info is not None and self._location_info[0] == key_index:
+                    self._location_info = None
+                    self.render_current_page()
+                    return
+                if self._location_frame is not None:
+                    point = location_map.tracked_point_at(self._location_frame, key_index)
+                    if point is not None:
+                        self._location_info = (key_index, point, time.monotonic() + 20.0)
+                        card = location_map.render_info_card(point, location_map.tile_image(self._location_frame, key_index))
                         self._set_key_image(key_index, card)
                         self.device.end_batch()
                 return

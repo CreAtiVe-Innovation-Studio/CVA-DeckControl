@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import psutil
+import requests
 import yaml
 
 
@@ -59,6 +61,56 @@ STATIC_DIR = (
 )
 
 SERVICE_NAME = "streamdeck-driver.service"
+UPDATE_CHECK_REPO = "CreAtiVe-Innovation-Studio/CVA-DeckControl"
+
+
+def _read_current_version() -> str:
+    """Liest __version__ aus streamdeck_driver/__init__.py per Text-Regex,
+    OHNE das Paket zu importieren - gui/server.py muss auch als
+    eigenstaendiges Skript per `python3 gui/server.py` laufen (siehe
+    Moduldocstring oben), ein direkter Import wuerde das brechen."""
+    try:
+        text = (DRIVER_ROOT / "streamdeck_driver" / "__init__.py").read_text(encoding="utf-8")
+        match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', text)
+        return match.group(1) if match else "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
+def _update_check() -> dict:
+    """Wie streamdeck_driver/update_check.py, aber unabhaengig aufrufbar -
+    wenn die GUI EINGEBETTET im Daemon laeuft (siehe gui/server.py's
+    start_in_thread(), genutzt vom 'open_gui'-Aktionstyp), ist
+    streamdeck_driver bereits importiert und wir nutzen dessen bereits
+    berechnetes (gecachtes) Ergebnis statt eines redundanten API-Calls -
+    beim eigenstaendigen `python3 gui/server.py` (kein Paket-Kontext, siehe
+    _read_current_version()) faellt das auf einen eigenen, unabhaengigen
+    Check zurueck."""
+    try:
+        from streamdeck_driver import update_check as _uc
+        result = _uc.get_last_result()
+        return result if result.get("checked") else _uc.check_now()
+    except ImportError:
+        pass
+
+    current = _read_current_version()
+    result = {"checked": True, "current": current, "latest": None, "update_available": False, "url": None}
+    try:
+        resp = requests.get(
+            f"https://api.github.com/repos/{UPDATE_CHECK_REPO}/releases/latest",
+            headers={"Accept": "application/vnd.github+json"}, timeout=5,
+        )
+        if resp.status_code != 404:
+            resp.raise_for_status()
+            data = resp.json()
+            latest = data.get("tag_name", "")
+            result["latest"], result["url"] = latest, data.get("html_url")
+            cur_nums = tuple(int(x) for x in re.findall(r"\d+", current)) or (0,)
+            latest_nums = tuple(int(x) for x in re.findall(r"\d+", latest)) or (0,)
+            result["update_available"] = latest_nums > cur_nums
+    except requests.RequestException:
+        pass
+    return result
 
 
 def _restart_daemon_windows() -> None:
@@ -243,6 +295,8 @@ class Handler(BaseHTTPRequestHandler):
                 ".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg",
             }.get(ext, "application/octet-stream")
             self._send_file(asset_path, ctype)
+        elif path == "/api/update-check":
+            self._send_json(_update_check())
         else:
             self._send_json({"error": "not found"}, 404)
 
