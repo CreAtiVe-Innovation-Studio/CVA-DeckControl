@@ -261,6 +261,15 @@ NICHT als sinnvolle Taste (das Profil wird vom Elgato Mini aus gewechselt) -
 `deckone_controller.py::switch_profile()` ist die Zielfunktion, die vom
 Elgato-Handler aufgerufen wird.
 
+**Icon bei `icon: {type: generated}`**: `switch_profile`-Tasten bekommen
+automatisch ein zum Ziel-`profile` passendes Symbol statt immer desselben
+Pfeil-Wirbels - `icon_render.py::_resolve_profile_symbol()` sucht Keywords
+im Profilnamen (z.B. "timer"→Uhr, "wo_ist"→Pin, "wetter"→Wolke,
+"nachhilfe"/"studium"→Buch, siehe `_PROFILE_KEYWORDS`). Kein Treffer (z.B.
+frei erfundene Profilnamen) → Rueckfall auf das generische Pfeil-Symbol,
+kein Fehler. Neues Profil mit passendem Symbol: Keyword einfach zu
+`_PROFILE_KEYWORDS` hinzufuegen, kein neuer Action-Type noetig.
+
 ### 4.8 `unmapped` - Platzhalter fuer "kein Linux-Aequivalent gefunden"
 
 Reiner Doku-Marker aus dem alten Windows-Import (z.B. fuer Tasten, die auf ein

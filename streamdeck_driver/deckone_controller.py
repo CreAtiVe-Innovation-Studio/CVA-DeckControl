@@ -225,6 +225,7 @@ class DeckOneController:
             size,
             title=key.get("title") or key.get("name", ""),
             action_type=action_type or "",
+            profile=key.get("action", {}).get("profile", ""),
         )
         if action_type in ("ha_toggle", "ha_cover") and not ha_client.is_healthy():
             return add_error_badge(card)

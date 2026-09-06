@@ -67,7 +67,148 @@ def _gradient_bg(size: tuple[int, int], top: tuple, bottom: tuple) -> Image.Imag
     return base.resize((w, h))
 
 
-def _draw_symbol(draw: ImageDraw.ImageDraw, action_type: str, size: tuple[int, int], accent: tuple) -> None:
+# switch_profile-Tasten sahen bisher IMMER identisch aus (derselbe Pfeil-
+# Wirbel), egal welches Profil sie anspringen - auf dem Elgato Mini (reine
+# Moduswahl, oft >10 Profile ueber mehrere Seiten) macht das die Tasten
+# untereinander ununterscheidbar bis auf den Titeltext. Keyword-Suche im
+# Profilnamen statt einer festen Tabelle, damit sowohl die echten
+# Profilnamen (streaming/timer/wo_ist/...) als auch frei erfundene Namen in
+# profiles.example.yaml (z.B. 'musik') automatisch ein passendes Symbol
+# bekommen, ohne dass fuer jedes neue eigene Profil Code angefasst werden muss.
+_PROFILE_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
+    (("timer", "pomodoro"), "clock"),
+    (("wo_ist", "standort", "ort", "location"), "pin"),
+    (("radar",), "radar"),
+    (("wetter", "weather", "regen", "rain"), "cloud"),
+    (("home", "zuhause", "heim"), "house"),
+    (("favorit",), "star"),
+    (("system", "stats"), "gauge"),
+    (("ki", "ai"), "chip"),
+    (("kommunikation", "chat", "mail"), "chat"),
+    (("coding", "code", "dev", "programm"), "code"),
+    (("gaming", "spiel", "game"), "controller"),
+    (("audio", "musik", "sound", "music"), "headphones"),
+    (("nachhilfe", "studium", "schule", "lernen", "study"), "book"),
+    (("kreativ", "design", "creative"), "palette"),
+    (("streaming", "stream"), "tower"),
+]
+
+
+def _resolve_profile_symbol(profile: str) -> str | None:
+    name = profile.lower()
+    for keywords, symbol in _PROFILE_KEYWORDS:
+        if any(kw in name for kw in keywords):
+            return symbol
+    return None
+
+
+def _draw_profile_symbol(draw: ImageDraw.ImageDraw, symbol: str, cx: int, cy: int, s: int, lw: int, accent: tuple) -> None:
+    if symbol == "clock":
+        r = int(s * 0.24)
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=accent, width=lw)
+        draw.line([cx, cy, cx, cy - r * 0.6], fill=accent, width=max(2, lw - 1))
+        draw.line([cx, cy, cx + r * 0.45, cy + r * 0.1], fill=accent, width=max(2, lw - 1))
+    elif symbol == "pin":
+        r = int(s * 0.18)
+        top_cy = cy - r * 0.3
+        draw.ellipse([cx - r, top_cy - r, cx + r, top_cy + r], outline=accent, width=lw)
+        draw.polygon([(cx - r * 0.55, top_cy + r * 0.7), (cx + r * 0.55, top_cy + r * 0.7), (cx, top_cy + r * 2.1)], fill=accent)
+    elif symbol == "radar":
+        for frac in (0.12, 0.2, 0.28):
+            r = int(s * frac)
+            draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=accent, width=max(2, lw - 1))
+        r = int(s * 0.28)
+        draw.line([cx, cy, cx + r * 0.9, cy - r * 0.6], fill=accent, width=lw)
+    elif symbol == "cloud":
+        r = int(s * 0.16)
+        draw.ellipse([cx - r * 1.6, cy - r * 0.2, cx - r * 0.2, cy + r * 1.1], fill=accent)
+        draw.ellipse([cx - r * 0.5, cy - r * 0.9, cx + r * 0.9, cy + r * 0.5], fill=accent)
+        draw.ellipse([cx + r * 0.1, cy - r * 0.2, cx + r * 1.7, cy + r * 1.1], fill=accent)
+        draw.rectangle([cx - r * 1.2, cy + r * 0.3, cx + r * 1.3, cy + r * 1.1], fill=accent)
+    elif symbol == "house":
+        hw, hh = int(s * 0.26), int(s * 0.2)
+        x0, y0 = cx - hw, cy + hh * 0.2
+        draw.rectangle([x0, y0, x0 + 2 * hw, y0 + hh], outline=accent, width=lw)
+        draw.polygon([(x0 - hw * 0.15, y0), (cx, y0 - hh * 1.3), (x0 + 2 * hw + hw * 0.15, y0)], outline=accent, width=lw)
+    elif symbol == "star":
+        r_out, r_in = int(s * 0.26), int(s * 0.11)
+        pts = []
+        for i in range(10):
+            r = r_out if i % 2 == 0 else r_in
+            ang = math.radians(-90 + i * 36)
+            pts.append((cx + r * math.cos(ang), cy + r * math.sin(ang)))
+        draw.polygon(pts, fill=accent)
+    elif symbol == "gauge":
+        r = int(s * 0.26)
+        draw.arc([cx - r, cy - r * 0.3, cx + r, cy + r * 1.7], start=180, end=360, fill=accent, width=lw)
+        draw.line([cx, cy + r * 0.5, cx + r * 0.7, cy - r * 0.05], fill=accent, width=max(2, lw - 1))
+    elif symbol == "chip":
+        r = int(s * 0.18)
+        draw.rectangle([cx - r, cy - r, cx + r, cy + r], outline=accent, width=lw)
+        pin_len = int(s * 0.08)
+        for frac in (-0.5, 0.5):
+            y = cy + frac * r
+            draw.line([cx - r - pin_len, y, cx - r, y], fill=accent, width=max(2, lw - 1))
+            draw.line([cx + r, y, cx + r + pin_len, y], fill=accent, width=max(2, lw - 1))
+    elif symbol == "chat":
+        bw, bh = int(s * 0.5), int(s * 0.32)
+        x0, y0 = cx - bw // 2, cy - bh // 2
+        draw.rounded_rectangle([x0, y0, x0 + bw, y0 + bh], radius=int(bh * 0.3), outline=accent, width=lw)
+        draw.polygon([(x0 + bw * 0.2, y0 + bh), (x0 + bw * 0.35, y0 + bh), (x0 + bw * 0.15, y0 + bh * 1.4)], fill=accent)
+    elif symbol == "code":
+        r = int(s * 0.2)
+        draw.line([cx - r * 1.6, cy - r * 0.7, cx - r * 0.6, cy], fill=accent, width=lw)
+        draw.line([cx - r * 0.6, cy, cx - r * 1.6, cy + r * 0.7], fill=accent, width=lw)
+        draw.line([cx + r * 1.6, cy - r * 0.7, cx + r * 0.6, cy], fill=accent, width=lw)
+        draw.line([cx + r * 0.6, cy, cx + r * 1.6, cy + r * 0.7], fill=accent, width=lw)
+    elif symbol == "controller":
+        bw, bh = int(s * 0.5), int(s * 0.24)
+        x0, y0 = cx - bw // 2, cy - bh // 2
+        draw.rounded_rectangle([x0, y0, x0 + bw, y0 + bh], radius=int(bh * 0.5), outline=accent, width=lw)
+        dr = max(2, int(s * 0.03))
+        for dy in (-bh * 0.15, bh * 0.15):
+            bx, by = x0 + bw * 0.78, y0 + bh * 0.5 + dy
+            draw.ellipse([bx - dr, by - dr, bx + dr, by + dr], fill=accent)
+        px, py = x0 + bw * 0.28, y0 + bh * 0.5
+        draw.line([px - bh * 0.2, py, px + bh * 0.2, py], fill=accent, width=max(2, lw - 1))
+        draw.line([px, py - bh * 0.2, px, py + bh * 0.2], fill=accent, width=max(2, lw - 1))
+    elif symbol == "headphones":
+        r = int(s * 0.24)
+        draw.arc([cx - r, cy - r * 0.3, cx + r, cy + r * 0.9], start=180, end=360, fill=accent, width=lw)
+        cw, ch = int(s * 0.12), int(s * 0.22)
+        draw.rounded_rectangle([cx - r - cw * 0.3, cy + r * 0.3, cx - r + cw * 0.7, cy + r * 0.3 + ch], radius=int(cw * 0.4), fill=accent)
+        draw.rounded_rectangle([cx + r - cw * 0.7, cy + r * 0.3, cx + r + cw * 0.3, cy + r * 0.3 + ch], radius=int(cw * 0.4), fill=accent)
+    elif symbol == "book":
+        bw, bh = int(s * 0.46), int(s * 0.32)
+        x0, y0 = cx - bw // 2, cy - bh // 2
+        draw.rounded_rectangle([x0, y0, x0 + bw, y0 + bh], radius=int(bh * 0.12), outline=accent, width=lw)
+        draw.line([cx, y0 + lw, cx, y0 + bh - lw], fill=accent, width=lw)
+        rw = int(bw * 0.14)
+        rx = x0 + bw * 0.7
+        draw.polygon(
+            [(rx, y0), (rx + rw, y0), (rx + rw, y0 + bh * 0.42), (rx + rw / 2, y0 + bh * 0.3), (rx, y0 + bh * 0.42)],
+            fill=accent,
+        )
+    elif symbol == "palette":
+        r = int(s * 0.24)
+        draw.ellipse([cx - r, cy - r * 0.8, cx + r, cy + r * 0.9], outline=accent, width=lw)
+        dr = max(2, int(s * 0.035))
+        for ang in (200, 260, 320, 20):
+            rad = math.radians(ang)
+            px, py = cx + r * 0.55 * math.cos(rad), cy + r * 0.4 * math.sin(rad)
+            draw.ellipse([px - dr, py - dr, px + dr, py + dr], fill=accent)
+    elif symbol == "tower":
+        r = max(2, int(s * 0.05))
+        draw.line([cx, cy - s * 0.22, cx, cy + s * 0.22], fill=accent, width=lw)
+        draw.ellipse([cx - r, cy - s * 0.22 - r, cx + r, cy - s * 0.22 + r], fill=accent)
+        for rad_frac in (0.12, 0.2):
+            rr = int(s * rad_frac)
+            box = [cx - rr, cy - s * 0.22 - rr, cx + rr, cy - s * 0.22 + rr]
+            draw.arc(box, start=-60, end=60, fill=accent, width=max(2, lw - 1))
+            draw.arc(box, start=120, end=240, fill=accent, width=max(2, lw - 1))
+
+
+def _draw_symbol(draw: ImageDraw.ImageDraw, action_type: str, size: tuple[int, int], accent: tuple, profile: str = "") -> None:
     """Groesseres, klareres Symbol im oberen Bereich der Karte (nimmt ~40%
     der Kartenhoehe ein, statt vorher ~15%)."""
     w, h = size
@@ -104,12 +245,16 @@ def _draw_symbol(draw: ImageDraw.ImageDraw, action_type: str, size: tuple[int, i
         r = int(s * 0.24)
         draw.polygon([(cx - r * 0.55, cy - r), (cx + r * 0.7, cy), (cx - r * 0.55, cy + r)], fill=accent)
     elif action_type == "switch_profile":
-        r = int(s * 0.22)
-        draw.arc([cx - r, cy - r, cx + r, cy + r], start=25, end=305, fill=accent, width=lw)
-        draw.polygon(
-            [(cx + r * 0.9, cy - r * 0.55), (cx + r * 1.45, cy - r * 0.1), (cx + r * 0.75, cy + r * 0.2)],
-            fill=accent,
-        )
+        symbol = _resolve_profile_symbol(profile) if profile else None
+        if symbol is not None:
+            _draw_profile_symbol(draw, symbol, cx, cy, s, lw, accent)
+        else:
+            r = int(s * 0.22)
+            draw.arc([cx - r, cy - r, cx + r, cy + r], start=25, end=305, fill=accent, width=lw)
+            draw.polygon(
+                [(cx + r * 0.9, cy - r * 0.55), (cx + r * 1.45, cy - r * 0.1), (cx + r * 0.75, cy + r * 0.2)],
+                fill=accent,
+            )
     elif action_type == "app_volume":
         bw, bh = int(s * 0.16), int(s * 0.26)
         x0, y0 = cx - int(s * 0.28), cy - bh // 2
@@ -151,7 +296,7 @@ def _draw_symbol(draw: ImageDraw.ImageDraw, action_type: str, size: tuple[int, i
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=accent, width=lw)
 
 
-def render_generated_icon(size: tuple[int, int], title: str, action_type: str = "") -> Image.Image:
+def render_generated_icon(size: tuple[int, int], title: str, action_type: str = "", profile: str = "") -> Image.Image:
     w, h = size
     top, bottom, accent = _TYPE_STYLE.get(action_type, _DEFAULT_STYLE)
 
@@ -175,7 +320,7 @@ def render_generated_icon(size: tuple[int, int], title: str, action_type: str = 
     img.paste(card, (margin, margin), mask)
 
     draw = ImageDraw.Draw(img)
-    _draw_symbol(draw, action_type, size, accent)
+    _draw_symbol(draw, action_type, size, accent, profile)
 
     text = (title or action_type or "?").strip()
     font_size = max(10, min(w, h) // 9)
@@ -636,7 +781,7 @@ def render_toggle_card(size: tuple[int, int], label: str, enabled: bool) -> Imag
     return img
 
 
-def render_key_icon(icon_def: dict, size: tuple[int, int], title: str, action_type: str = "") -> Image.Image:
+def render_key_icon(icon_def: dict, size: tuple[int, int], title: str, action_type: str = "", profile: str = "") -> Image.Image:
     if icon_def and icon_def.get("type") == "app_icon":
         asset_path = PROJECT_ROOT / icon_def["path"]
         if asset_path.exists():
@@ -648,10 +793,13 @@ def render_key_icon(icon_def: dict, size: tuple[int, int], title: str, action_ty
             return img.resize(size)
     # Generisches KI-generiertes Icon je Aktionstyp (hotkey/website/Seitenwechsel/...)
     # als Fallback, bevor auf das gezeichnete Vektor-Icon zurueckgefallen wird.
+    # (profilspezifische Symbole bei switch_profile gibt es nur im gezeichneten
+    # Vektor-Icon, nicht ueber diesen Datei-Fallback - waere pro Profil eine
+    # eigene PNG, lohnt sich nicht neben der Keyword-Symbolwahl unten.)
     generic_path = GENERATED_ICON_DIR / f"{action_type}.png"
     if action_type and generic_path.exists():
         return render_app_icon_card(size, generic_path, title)
-    return render_generated_icon(size, title, action_type)
+    return render_generated_icon(size, title, action_type, profile)
 
 
 def blank_icon(size: tuple[int, int]) -> Image.Image:

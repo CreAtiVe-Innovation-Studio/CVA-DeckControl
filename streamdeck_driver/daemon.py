@@ -66,6 +66,7 @@ class ElgatoController:
             size,
             title=key.get("title") or key.get("name", ""),
             action_type=key.get("action", {}).get("type", ""),
+            profile=key.get("action", {}).get("profile", ""),
         )
 
     def render_current_page(self) -> None:

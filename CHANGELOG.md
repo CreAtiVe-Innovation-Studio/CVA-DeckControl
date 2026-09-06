@@ -2,6 +2,18 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.0] - 2026-09-06
+
+### Added
+- `switch_profile` tiles now get an icon matching their target profile
+  instead of always the same generic arrow (`icon_render.py::
+  _resolve_profile_symbol()`, keyword-matched against the profile name -
+  timer→clock, wo_ist→pin, wetter→cloud, nachhilfe/studium→book, and 11
+  more). Matters most on the Elgato Mini, whose whole purpose is switching
+  between potentially 10+ profiles across several pages - those tiles used
+  to be indistinguishable except for their title text. No keyword match
+  (e.g. a made-up profile name) falls back to the original arrow icon.
+
 ## [1.6.1] - 2026-09-06
 
 ### Fixed
