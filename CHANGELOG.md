@@ -2,6 +2,19 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.2] - 2026-09-06
+
+### Fixed
+- Screenshot action's clipboard copy was hardcoded to `wl-copy` (Wayland
+  only) - live reported after switching a session from Wayland to X11,
+  where it fails silently ("Failed to connect to a Wayland server"),
+  breaking clipboard copy with no visible error. Now detects the running
+  session at runtime (`WAYLAND_DISPLAY`/`XDG_SESSION_TYPE`) and picks
+  `wl-copy` or `xclip` accordingly; a missing tool now logs one clear,
+  actionable line instead of failing silently. Also fixed the temp
+  screenshot file being left behind in `/tmp` whenever the clipboard copy
+  step failed (cleanup now always runs).
+
 ## [1.7.1] - 2026-09-06
 
 ### Fixed

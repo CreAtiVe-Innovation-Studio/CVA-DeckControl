@@ -253,6 +253,16 @@ Details/caveats live directly in the affected module
 (`streamdeck_driver/platform_backend/macos.py`,
 `streamdeck_driver/devices/elgato_generic.py`).
 
+**Linux system tools used by some action types** (not installed by
+`install.sh`, which only handles Python packages): `ydotool`/`ydotoold`
+(hotkeys), `gnome-screenshot` + `zenity` (screenshot/popups, GNOME-specific),
+`wpctl`/PipeWire (per-app volume). The screenshot action also copies to the
+clipboard, and picks the right tool automatically for the running
+session — `wl-copy` (package `wl-clipboard`) under Wayland, `xclip` under
+X11 — so both need to actually be installed for whichever session type you
+use; missing the right one logs a clear one-line warning instead of failing
+silently.
+
 ## FAQ
 
 **Do I need Home Assistant?** No — only for the optional

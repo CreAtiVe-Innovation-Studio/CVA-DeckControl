@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import shlex
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -48,19 +50,42 @@ def open_url(url: str) -> None:
         logger.error("Website konnte nicht geoeffnet werden (%s): %s", url, exc)
 
 
+def _is_wayland_session() -> bool:
+    return bool(os.environ.get("WAYLAND_DISPLAY")) or os.environ.get("XDG_SESSION_TYPE") == "wayland"
+
+
 def take_screenshot_interactive() -> None:
     """Siehe actions.py-Historie: ydotool-PrintScreen loest unter GNOME/
     Wayland keinen Screenshot aus, direkter D-Bus-Aufruf scheitert an
-    Portal-Berechtigungen -> 'gnome-screenshot' CLI direkt. Clipboard-Kopie
-    per 'wl-copy' aus einer temporaeren Datei, da kurzlebige Prozesse ihre
-    Wayland-Clipboard-Ownership sofort nach Prozessende verlieren."""
+    Portal-Berechtigungen -> 'gnome-screenshot' CLI direkt.
+
+    BUG GEFUNDEN 2026-09-06 (live gemeldet: nach Wechsel von einer Wayland-
+    auf eine X11-Session "klappt alles nicht mehr") - das Clipboard-Werkzeug
+    war fest auf 'wl-copy' verdrahtet, das unter X11 nur lautlos mit
+    'Failed to connect to a Wayland server' auf stderr fehlschlaegt (live
+    reproduziert). Erkennung jetzt zur LAUFZEIT ueber WAYLAND_DISPLAY/
+    XDG_SESSION_TYPE (nicht einmalig beim Import), damit ein Wechsel
+    zwischen X11- und Wayland-Login ohne Neuinstallation funktioniert -
+    xclip fuer X11, wl-copy fuer Wayland. Ausserdem: die alte '&&'-Kette
+    hat bei einem fehlschlagenden Copy-Schritt auch das 'rm -f' uebersprungen,
+    also verwaiste Temp-Screenshots in /tmp hinterlassen - jetzt mit ';'
+    verkettet, Aufraeumen passiert immer."""
+    wayland = _is_wayland_session()
+    copy_tool = "wl-copy" if wayland else "xclip"
+    if shutil.which(copy_tool) is None:
+        logger.error(
+            "Screenshot-Clipboard: '%s' nicht installiert (noetig fuer diese %s-Session) - "
+            "Bild wird trotzdem aufgenommen, landet aber nicht im Clipboard. Installieren: %s",
+            copy_tool, "Wayland" if wayland else "X11",
+            "sudo apt install wl-clipboard" if wayland else "sudo apt install xclip",
+        )
+    copy_cmd = 'wl-copy < "$f"' if wayland else 'xclip -selection clipboard -t image/png < "$f"'
     try:
         subprocess.Popen([
             "bash", "-c",
-            'f=$(mktemp --suffix=.png) && gnome-screenshot --area --file="$f" '
-            '&& wl-copy < "$f" && rm -f "$f"',
+            f'f=$(mktemp --suffix=.png) && gnome-screenshot --area --file="$f"; {copy_cmd}; rm -f "$f"',
         ])
-        logger.info("Screenshot-Bereichsauswahl gestartet (Datei + wl-copy)")
+        logger.info("Screenshot-Bereichsauswahl gestartet (Datei + %s)", copy_tool)
     except (subprocess.SubprocessError, FileNotFoundError) as exc:
         logger.error("Screenshot fehlgeschlagen: %s", exc)
 
