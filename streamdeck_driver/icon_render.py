@@ -619,6 +619,33 @@ def blank_icon(size: tuple[int, int]) -> Image.Image:
     return Image.new("RGB", size, (15, 15, 18))
 
 
+_ERROR_BADGE_COLOR = (211, 47, 47)  # kraeftiges Rot, deutlich abgesetzt von jeder Kartenfarbe
+
+
+def add_error_badge(img: Image.Image) -> Image.Image:
+    """Blendet eine kleine rote Warn-Badge (Kreis + '!') oben rechts auf eine
+    fertig gerenderte Kachel ein - fuer HA-abhaengige Kacheln, wenn die
+    letzte Anfrage an Home Assistant fehlgeschlagen ist (ha_client.is_healthy()),
+    statt dass der Fehler nur im Log landet und die Kachel weiterhin harmlos
+    '--' anzeigt."""
+    out = img.convert("RGB").copy()
+    w, h = out.size
+    draw = ImageDraw.Draw(out, "RGBA")
+    r = max(10, round(min(w, h) * 0.14))
+    margin = max(2, round(min(w, h) * 0.05))
+    cx, cy = w - r - margin, r + margin
+    draw.ellipse(
+        [cx - r, cy - r, cx + r, cy + r],
+        fill=(*_ERROR_BADGE_COLOR, 235), outline=(255, 255, 255, 255), width=max(1, round(r * 0.12)),
+    )
+    font = _load_font(round(r * 1.3))
+    text = "!"
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text((cx - tw / 2 - bbox[0], cy - th / 2 - bbox[1]), text, font=font, fill=(255, 255, 255, 255))
+    return out
+
+
 def zoom_icon(img: Image.Image, factor: float = 1.18) -> Image.Image:
     """Kurzer 'Punch'-Zoom fuers Tastendruck-Feedback: croppt die Bildmitte
     enger und skaliert wieder auf die Zielgroesse hoch - wirkt wie ein

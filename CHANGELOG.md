@@ -2,6 +2,17 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.0] - 2026-09-06
+
+### Added
+- Visible error badge on Home-Assistant-backed tiles (`ha_sensor`,
+  `weather_forecast`, `ha_toggle`, `ha_cover`): a small red badge appears
+  when the last request to Home Assistant failed, instead of the failure
+  only being logged while the tile keeps showing a harmless `--`. Tracked
+  via `ha_client.is_healthy()`, a whole-client reachability flag updated by
+  every kind of HA API call. Clears itself on the next successful call, no
+  separate health-check request needed.
+
 ## [1.4.0] - 2026-09-06
 
 ### Added

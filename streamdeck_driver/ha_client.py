@@ -22,6 +22,7 @@ _secrets: dict | None = None
 _cache: dict[str, dict] = {}
 _cache_time = 0.0
 _forecast_cache: dict[tuple[str, str], dict] = {}
+_healthy = True  # Ergebnis der letzten HA-API-Anfrage (gleich welcher Art)
 
 
 def _load_secrets() -> dict:
@@ -37,7 +38,7 @@ def _headers() -> dict:
 
 
 def _refresh_cache() -> None:
-    global _cache, _cache_time
+    global _cache, _cache_time, _healthy
     now = time.monotonic()
     if _cache and now - _cache_time < CACHE_TTL_S:
         return
@@ -47,8 +48,19 @@ def _refresh_cache() -> None:
         resp.raise_for_status()
         _cache = {e["entity_id"]: e for e in resp.json()}
         _cache_time = now
+        _healthy = True
     except requests.RequestException as exc:
         logger.warning("HA: Zustaende konnten nicht geladen werden: %s", exc)
+        _healthy = False
+
+
+def is_healthy() -> bool:
+    """True wenn der letzte HA-API-Aufruf (gleich welcher Art - Zustaende,
+    Service-Aufruf, Vorhersage) erfolgreich war. Fuer eine sichtbare
+    Fehler-Badge auf HA-abhaengigen Kacheln (siehe icon_render.add_error_badge)
+    statt dass eine fehlgeschlagene Anfrage nur im Log verschwindet und die
+    Kachel weiterhin harmlos '--' anzeigt."""
+    return _healthy
 
 
 def get_state(entity_id: str) -> dict | None:
@@ -69,16 +81,18 @@ def list_domain(domain: str) -> list[dict]:
 
 def call_service(domain: str, service: str, entity_id: str) -> bool:
     """Ruft einen beliebigen HA-Service auf (z.B. cover.open_cover)."""
+    global _cache_time, _healthy
     url = f"{_load_secrets()['url']}/api/services/{domain}/{service}"
     try:
         resp = requests.post(url, headers=_headers(), json={"entity_id": entity_id}, timeout=5)
         resp.raise_for_status()
         logger.info("HA: %s.%s auf %s aufgerufen", domain, service, entity_id)
-        global _cache_time
         _cache_time = 0.0  # naechster Read soll frischen Zustand holen
+        _healthy = True
         return True
     except requests.RequestException as exc:
         logger.error("HA: %s.%s fuer %s fehlgeschlagen: %s", domain, service, entity_id, exc)
+        _healthy = False
         return False
 
 
@@ -91,6 +105,7 @@ def get_forecast(entity_id: str, forecast_type: str = "daily") -> list[dict] | N
     jeweiligen Wetter-Integration ab, nicht jede bietet alle drei.
     15min gecacht (viel laenger als der normale State-Cache, Vorhersagen
     aendern sich nicht sekuendlich)."""
+    global _healthy
     cache_key = (entity_id, forecast_type)
     now = time.monotonic()
     cached = _forecast_cache.get(cache_key)
@@ -105,9 +120,11 @@ def get_forecast(entity_id: str, forecast_type: str = "daily") -> list[dict] | N
         data = resp.json()
         forecast = data.get("service_response", {}).get(entity_id, {}).get("forecast")
         _forecast_cache[cache_key] = {"data": forecast, "fetched_at": now}
+        _healthy = True
         return forecast
     except requests.RequestException as exc:
         logger.warning("HA: Wettervorhersage fuer %s (%s) fehlgeschlagen: %s", entity_id, forecast_type, exc)
+        _healthy = False
         return None
 
 

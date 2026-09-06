@@ -12,7 +12,7 @@ import time
 from . import actions, ha_client, hw_monitor, live_view, location_map, process_monitor, radar, timer_engine
 from .devices.deckone import DeckOne
 from .icon_render import (
-    blank_icon, render_key_icon, render_stat_card, render_timer_card,
+    add_error_badge, blank_icon, render_key_icon, render_stat_card, render_timer_card,
     render_toggle_card, render_weather_forecast_card, zoom_icon,
 )
 
@@ -220,12 +220,15 @@ class DeckOneController:
             # Loop (daemon.py, alle 0.5s) den Server tatsaechlich (ge)startet
             # hat - sonst zeigt die Taste kurz noch den alten Zustand.
             return render_toggle_card(size, label, live_view.ENABLED_FLAG_PATH.exists())
-        return render_key_icon(
+        card = render_key_icon(
             key.get("icon", {}),
             size,
             title=key.get("title") or key.get("name", ""),
             action_type=action_type or "",
         )
+        if action_type in ("ha_toggle", "ha_cover") and not ha_client.is_healthy():
+            return add_error_badge(card)
+        return card
 
     def _timer_key_id(self, key_index: int) -> str:
         return f"{self.active_profile}:{self.current_page_index}:{key_index}"
@@ -249,7 +252,8 @@ class DeckOneController:
         label = key.get("title") or key.get("name", "")
         state_obj = ha_client.get_state(entity_id)
         if state_obj is None:
-            return render_stat_card(size, label, value=None, unit="", value_text="--", color_percent=30)
+            card = render_stat_card(size, label, value=None, unit="", value_text="--", color_percent=30)
+            return add_error_badge(card) if not ha_client.is_healthy() else card
         attrs = state_obj.get("attributes", {})
         if entity_id.startswith("weather."):
             temp = attrs.get("temperature")
@@ -279,7 +283,8 @@ class DeckOneController:
         label = key.get("title") or key.get("name", "")
         forecast = ha_client.get_forecast(entity_id, forecast_type)
         if not forecast or offset >= len(forecast):
-            return render_weather_forecast_card(size, label, None, None, None)
+            card = render_weather_forecast_card(size, label, None, None, None)
+            return add_error_badge(card) if not ha_client.is_healthy() else card
         entry = forecast[offset]
         return render_weather_forecast_card(
             size, label, entry.get("condition"),
