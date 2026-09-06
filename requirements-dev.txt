@@ -1,0 +1,3 @@
+# Nur zum Entwickeln/Testen noetig (siehe tests/), NICHT fuer den
+# eigentlichen Treiber - siehe requirements.txt dafuer.
+pytest>=7.4

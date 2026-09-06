@@ -1,5 +1,7 @@
 # CVA-DeckControl
 
+[![Tests](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/actions/workflows/tests.yml/badge.svg)](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/actions/workflows/tests.yml)
+
 **Read this in other languages:** 🇩🇪 [Deutsch](docs/README_DE.md) · [Changelog](CHANGELOG.md)
 
 Self-built driver with openly viewable source (source-available, see
@@ -278,6 +280,12 @@ Issues are welcome — most helpful are: which device/platform, what
 exactly doesn't work, and log output if possible. For the parts marked
 experimental (macOS, other Elgato models) especially, real feedback is
 the only way to harden them.
+
+There's an automated test suite (`pip install -r requirements-dev.txt && pytest`,
+runs on every push via GitHub Actions) covering the pure logic — tile
+geometry, zoom math, the timer state machine. It intentionally doesn't
+(and can't) cover anything needing real hardware or a live Home Assistant
+instance — see [tests/README.md](tests/README.md) for the exact scope.
 
 ## License
 

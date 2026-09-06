@@ -1,0 +1,20 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Bewusst NICHT die volle requirements.txt (hidapi/pyusb brauchen
+      # System-Bibliotheken, die auf einem nackten CI-Runner ohne
+      # Extra-Schritte nicht da sind, und werden von den getesteten Modulen
+      # gar nicht importiert - siehe tests/README.md).
+      - run: pip install Pillow requests PyYAML pytest
+      - run: pytest -v

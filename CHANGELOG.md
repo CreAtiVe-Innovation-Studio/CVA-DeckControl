@@ -2,6 +2,21 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.0] - 2026-09-06
+
+### Added
+- Automated test suite (`tests/`, pytest) covering the pure-logic modules:
+  `grid.py`'s tile geometry, the Web-Mercator/zoom math in `radar.py` and
+  `location_map.py`, the timer state machine, and `update_check.py`'s
+  version comparison. 39 tests, all passing. Deliberately does not (and
+  cannot) cover anything needing real hardware or a live Home Assistant
+  instance — see `tests/README.md`.
+- GitHub Actions CI (`.github/workflows/tests.yml`) runs the suite on every
+  push/PR, with a minimal dependency set (not the full `requirements.txt` —
+  `hidapi`/`pyusb` need system libraries a bare CI runner doesn't have and
+  aren't imported by anything the tests touch).
+- `requirements-dev.txt` for local test running.
+
 ## [1.2.1] - 2026-09-06
 
 **Not yet extensively tested** — behavior-preserving refactor, checked
