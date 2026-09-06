@@ -2,6 +2,16 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.6.1] - 2026-09-06
+
+### Fixed
+- Five action types (`app_volume`, `open_gui`, `unmapped`, `ha_toggle`,
+  `ha_cover`) had no dedicated generated-icon symbol and all fell back to
+  the same plain circle, making tiles for genuinely different actions look
+  identical. Added distinct symbols (speaker, gear, warning triangle,
+  lightbulb, up/down chevrons) and dedicated colors for `ha_toggle`/
+  `ha_cover`, which previously also shared the generic default color.
+
 ## [1.6.0] - 2026-09-06
 
 ### Added

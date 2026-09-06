@@ -3,6 +3,7 @@ ein generiertes Icon (Karten-Look mit abgerundeten Ecken, Farbverlauf,
 zentralem Symbol + Titeltext) fuer Tasten ohne eigenes Bild-Asset."""
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -46,6 +47,8 @@ _TYPE_STYLE = {
     "app_volume":     ((20, 90, 100),  (10, 50, 58),  (255, 255, 255)),
     "open_gui":       ((70, 70, 92),   (34, 34, 46),  (255, 255, 255)),
     "unmapped":       ((120, 45, 45),  (68, 22, 22),  (255, 200, 200)),
+    "ha_toggle":      ((130, 100, 20), (74, 56, 10),  (255, 224, 130)),
+    "ha_cover":       ((58, 68, 84),   (30, 36, 46),  (255, 255, 255)),
 }
 _DEFAULT_STYLE = ((36, 90, 150), (18, 52, 90), (255, 255, 255))
 
@@ -107,6 +110,42 @@ def _draw_symbol(draw: ImageDraw.ImageDraw, action_type: str, size: tuple[int, i
             [(cx + r * 0.9, cy - r * 0.55), (cx + r * 1.45, cy - r * 0.1), (cx + r * 0.75, cy + r * 0.2)],
             fill=accent,
         )
+    elif action_type == "app_volume":
+        bw, bh = int(s * 0.16), int(s * 0.26)
+        x0, y0 = cx - int(s * 0.28), cy - bh // 2
+        draw.rectangle([x0, y0, x0 + bw, y0 + bh], fill=accent)
+        draw.polygon(
+            [(x0 + bw, y0 - bh * 0.35), (x0 + bw + int(s * 0.14), y0 - bh * 0.75),
+             (x0 + bw + int(s * 0.14), y0 + bh * 1.75), (x0 + bw, y0 + bh * 1.35)],
+            fill=accent,
+        )
+        for r in (int(s * 0.15), int(s * 0.24)):
+            draw.arc([cx + int(s * 0.02) - r, cy - r, cx + int(s * 0.02) + r, cy + r], start=-35, end=35, fill=accent, width=max(2, lw - 1))
+    elif action_type == "open_gui":
+        r_outer, r_inner = int(s * 0.24), int(s * 0.1)
+        for i in range(8):
+            angle = i * (360 / 8)
+            rad = math.radians(angle)
+            x1, y1 = cx + r_outer * 0.72 * math.cos(rad), cy + r_outer * 0.72 * math.sin(rad)
+            x2, y2 = cx + r_outer * 1.15 * math.cos(rad), cy + r_outer * 1.15 * math.sin(rad)
+            draw.line([x1, y1, x2, y2], fill=accent, width=lw)
+        draw.ellipse([cx - r_outer * 0.72, cy - r_outer * 0.72, cx + r_outer * 0.72, cy + r_outer * 0.72], outline=accent, width=lw)
+        draw.ellipse([cx - r_inner, cy - r_inner, cx + r_inner, cy + r_inner], fill=accent)
+    elif action_type == "unmapped":
+        r = int(s * 0.26)
+        draw.polygon([(cx, cy - r), (cx - r * 0.95, cy + r * 0.8), (cx + r * 0.95, cy + r * 0.8)], outline=accent, width=lw)
+        draw.line([cx, cy - r * 0.15, cx, cy + r * 0.35], fill=accent, width=lw)
+        dr = max(2, lw // 2 + 1)
+        draw.ellipse([cx - dr, cy + r * 0.55 - dr, cx + dr, cy + r * 0.55 + dr], fill=accent)
+    elif action_type == "ha_toggle":
+        r = int(s * 0.18)
+        draw.ellipse([cx - r, cy - r * 1.1, cx + r, cy + r * 1.1], outline=accent, width=lw)
+        draw.line([cx - r * 0.4, cy + r * 1.1, cx + r * 0.4, cy + r * 1.1], fill=accent, width=lw)
+        draw.line([cx - r * 0.3, cy + r * 1.5, cx + r * 0.3, cy + r * 1.5], fill=accent, width=max(2, lw - 1))
+    elif action_type == "ha_cover":
+        r = int(s * 0.16)
+        draw.polygon([(cx - r, cy - r * 0.2), (cx, cy - r * 0.9), (cx + r, cy - r * 0.2)], outline=accent, width=lw)
+        draw.polygon([(cx - r, cy + r * 0.9), (cx, cy + r * 0.2), (cx + r, cy + r * 0.9)], outline=accent, width=lw)
     else:
         r = int(s * 0.18)
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=accent, width=lw)
