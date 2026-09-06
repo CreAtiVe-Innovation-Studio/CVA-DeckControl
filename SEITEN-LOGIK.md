@@ -282,6 +282,48 @@ wartet bis zu 5s auf Erreichbarkeit) und oeffnet danach den Browser darauf
 (`platform_backend.open_url()`) - macht die GUI von einer physischen Taste aus
 erreichbar, ohne Terminal.
 
+### 4.10 `weather_forecast` - Wettervorhersage-Kachel (nur DECK ONE, braucht Home Assistant)
+
+```yaml
+action:
+  type: weather_forecast
+  entity_id: weather.home    # eine 'weather.*'-Entity in Home Assistant
+  forecast_type: daily       # 'daily', 'hourly' oder 'twice_daily' - je nach Wetter-Integration
+  offset: 1                  # 0 = naechster Eintrag der Granularitaet, 1 = der danach, ...
+```
+
+Passive Anzeige-Kachel wie `ha_sensor`, aber fuer die VORHERSAGE statt den
+aktuellen Zustand - `ha_client.py::get_forecast()` ruft dafuer den
+`weather.get_forecasts`-Service auf (seit HA 2023.9 der Weg dafuer, das alte
+`forecast`-Attribut direkt auf der Entity gibt es nicht mehr), 15min gecacht.
+Rendering ueber `icon_render.py::render_weather_forecast_card()` - eigene
+Farblogik nach Wetterlage (blau=Regen, gelb=sonnig, grau=bewoelkt, ...) statt
+der Ampel-Prozent-Faerbung von `render_stat_card`. `offset` ist NICHT
+zwingend "heute"/"morgen" - bei `forecast_type: daily` haengt es von der
+Wetter-Integration ab, ob Index 0 der Rest des heutigen Tages oder schon
+morgen ist.
+
+### 4.11 Sonderfall `wetter_vorhersage`-Profil - reine Niederschlags-Vorhersage-Karte
+
+Wie das `radar`-Profil (Abschnitt 3) eine Sonderbehandlung in
+`deckone_controller.py::_render_forecast_page()`: EIN grosses Kartenbild
+statt Taste-fuer-Taste aus der YAML, hier aber bewusst NUR Regen-Vorhersage
+(RainViewer-"Nowcast", naechste ~30-60min) ohne Flugzeuge/Blitze/Avatar -
+siehe `radar.py::build_forecast_frame()`. Taste unten rechts = naechster
+Vorhersage-Frame (zyklisch, wie die manuelle Zoom-Taste beim Radar). Kann
+"keine Daten" anzeigen statt einer Karte - RainViewer garantiert Nowcast-
+Daten nicht immer/ueberall, das ist kein Bug.
+
+```yaml
+deckone:
+  profiles:
+    wetter_vorhersage:
+      color: '#38BDF8'
+      pages:
+      - name: Regenvorhersage
+        keys: {}    # bleibt leer, wird komplett prozedural gerendert
+```
+
 ---
 
 ## 5. Icons (`icon:`-Feld pro Taste)

@@ -108,6 +108,16 @@ deckone:
               type: open_gui
             icon:
               type: generated
+          8:
+            name: Vorhersage
+            title: Morgen
+            action:
+              type: weather_forecast
+              entity_id: weather.home
+              forecast_type: daily
+              offset: 1
+            icon:
+              type: generated
     musik:
       color: '#00C851'
       pages:

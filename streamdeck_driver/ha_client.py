@@ -16,10 +16,12 @@ logger = logging.getLogger("streamdeck_driver.ha_client")
 
 SECRETS_PATH = app_root() / "config" / "ha_secrets.yaml"
 CACHE_TTL_S = 2.0
+FORECAST_CACHE_TTL_S = 900.0  # 15min - Vorhersagen aendern sich nicht sekuendlich
 
 _secrets: dict | None = None
 _cache: dict[str, dict] = {}
 _cache_time = 0.0
+_forecast_cache: dict[tuple[str, str], dict] = {}
 
 
 def _load_secrets() -> dict:
@@ -78,6 +80,35 @@ def call_service(domain: str, service: str, entity_id: str) -> bool:
     except requests.RequestException as exc:
         logger.error("HA: %s.%s fuer %s fehlgeschlagen: %s", domain, service, entity_id, exc)
         return False
+
+
+def get_forecast(entity_id: str, forecast_type: str = "daily") -> list[dict] | None:
+    """Wettervorhersage ueber den weather.get_forecasts-Service (seit HA
+    2023.9 der Weg dafuer - das alte 'forecast'-Attribut direkt auf der
+    Entity ist deprecated/mittlerweile entfernt, taucht also NICHT in
+    get_state()/list_domain() auf). forecast_type: 'daily', 'hourly' oder
+    'twice_daily' - welche davon unterstuetzt werden, haengt von der
+    jeweiligen Wetter-Integration ab, nicht jede bietet alle drei.
+    15min gecacht (viel laenger als der normale State-Cache, Vorhersagen
+    aendern sich nicht sekuendlich)."""
+    cache_key = (entity_id, forecast_type)
+    now = time.monotonic()
+    cached = _forecast_cache.get(cache_key)
+    if cached and now - cached["fetched_at"] < FORECAST_CACHE_TTL_S:
+        return cached["data"]
+    url = f"{_load_secrets()['url']}/api/services/weather/get_forecasts?return_response"
+    try:
+        resp = requests.post(
+            url, headers=_headers(), json={"entity_id": entity_id, "type": forecast_type}, timeout=8,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        forecast = data.get("service_response", {}).get(entity_id, {}).get("forecast")
+        _forecast_cache[cache_key] = {"data": forecast, "fetched_at": now}
+        return forecast
+    except requests.RequestException as exc:
+        logger.warning("HA: Wettervorhersage fuer %s (%s) fehlgeschlagen: %s", entity_id, forecast_type, exc)
+        return None
 
 
 def toggle(entity_id: str) -> bool:

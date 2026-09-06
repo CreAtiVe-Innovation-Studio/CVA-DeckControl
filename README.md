@@ -32,6 +32,12 @@ was simply fun to talk to the hardware directly.
   the radar, showing tracked people via Home Assistant (`person`/
   `device_tracker` entities) with auto-fit zoom — tested, but not
   extensively (see the dedicated section below)
+- **Rain forecast map**: a separate, stripped-down map page showing only
+  RainViewer's precipitation *forecast* (next ~30-60 min), no live traffic/
+  lightning clutter — tested, but not extensively (see below)
+- **Weather forecast tiles**: a `weather_forecast` action type for simple
+  per-key forecast cards (temperature/condition, any day or hour ahead),
+  via Home Assistant's forecast service
 - Action types: hotkeys, launching programs/URLs, per-app volume, live
   system metrics (CPU/RAM/GPU), Home Assistant control, and more — full
   list in [SEITEN-LOGIK.md](SEITEN-LOGIK.md) (German, technical reference)
@@ -206,6 +212,27 @@ Apple Find My.
 Without any tracker configured, the page shows a "no trackers found" card
 instead of an empty or broken map. Press a pin's key to see the tracked
 person's name/distance/direction from home; press again to hide it.
+
+## Weather forecast
+
+**Tested, but not extensively** — same caveat as the location map: checked
+against live data, but not over an extended period. If something looks
+off, please open an issue.
+
+Two independent pieces, both via Home Assistant's weather forecast service
+(no separate setup beyond `config/ha_secrets.yaml` and a `weather.*`
+entity — the same one HA already uses for its own forecast card):
+
+- **`weather_forecast` action type** — a simple per-key card (see
+  [SEITEN-LOGIK.md](SEITEN-LOGIK.md) section 4.10) showing temperature and
+  condition for any day/hour ahead you configure.
+- **`wetter_vorhersage` profile** — a separate map page (own profile, not
+  part of the radar) showing *only* RainViewer's precipitation forecast
+  (the next ~30-60 minutes, in ~10-minute steps) with no live traffic/
+  lightning on it. Press the bottom-right key to step through the
+  available forecast frames. RainViewer doesn't guarantee forecast data is
+  always available for every location — the page shows "no data" instead
+  of an empty or broken map when that's the case.
 
 ## Platform support
 

@@ -157,31 +157,55 @@ def _fetch_tile(z: int, x: int, y: int) -> Image.Image:
     return img
 
 
-_rainviewer_cache: dict = {"frame_path": None, "fetched_at": 0.0}
+_rainviewer_cache: dict = {"data": None, "fetched_at": 0.0}
 RAINVIEWER_TTL_S = 300.0  # neue Radar-Frames alle ~10min, 5min Cache reicht
 MAX_PRECIP_ZOOM = 7  # jenseits davon (live geprueft) nur "Zoom Level Not Supported"-Kacheln
 PRECIP_OPACITY = 0.5  # RainViewer-Kacheln sind bei starkem Regen fast deckend
 
 
-def _rainviewer_frame_path() -> str | None:
-    """Wolken/Niederschlag ueber RainViewer (kostenlos, kein Key) - liefert
-    den Pfad zum aktuellsten Radar-Frame, 5min gecacht."""
+def _rainviewer_data() -> dict | None:
+    """Rohe weather-maps.json-Antwort, 5min gecacht - enthaelt sowohl die
+    'past'-Frames (fuer den JETZT-Zustand, siehe _rainviewer_frame_path) als
+    auch 'nowcast' (Vorhersage, siehe _rainviewer_nowcast_frames), beide aus
+    demselben API-Aufruf statt zwei separaten."""
     now = time.monotonic()
-    if _rainviewer_cache["frame_path"] and now - _rainviewer_cache["fetched_at"] < RAINVIEWER_TTL_S:
-        return _rainviewer_cache["frame_path"]
+    if _rainviewer_cache["data"] and now - _rainviewer_cache["fetched_at"] < RAINVIEWER_TTL_S:
+        return _rainviewer_cache["data"]
     try:
         resp = requests.get("https://api.rainviewer.com/public/weather-maps.json", timeout=6)
         resp.raise_for_status()
         data = resp.json()
-        frames = data.get("radar", {}).get("past", [])
-        if not frames:
-            return None
-        _rainviewer_cache["frame_path"] = data["host"] + frames[-1]["path"]
+        _rainviewer_cache["data"] = data
         _rainviewer_cache["fetched_at"] = now
-        return _rainviewer_cache["frame_path"]
+        return data
     except Exception as exc:
         logger.warning("RainViewer Frame-Info fehlgeschlagen: %s", exc)
         return None
+
+
+def _rainviewer_frame_path() -> str | None:
+    """Wolken/Niederschlag ueber RainViewer (kostenlos, kein Key) - liefert
+    den Pfad zum aktuellsten (JETZT-)Radar-Frame."""
+    data = _rainviewer_data()
+    if not data:
+        return None
+    frames = data.get("radar", {}).get("past", [])
+    if not frames:
+        return None
+    return data["host"] + frames[-1]["path"]
+
+
+def _rainviewer_nowcast_frames() -> list[dict]:
+    """Liste der RainViewer-VORHERSAGE-Frames (naechste ~30-60min, alle
+    10min), aeltester zuerst - fuer die reine Vorhersage-Kartenseite (siehe
+    build_forecast_frame()). Kann leer sein, RainViewer garantiert Nowcast
+    nicht immer/ueberall - Aufrufer muss das vertragen (siehe dortiger
+    Platzhalter-Text)."""
+    data = _rainviewer_data()
+    if not data:
+        return []
+    host = data.get("host", "")
+    return [{"time": f["time"], "path": host + f["path"]} for f in data.get("radar", {}).get("nowcast", [])]
 
 
 RAIN_AVATAR_ZOOM = 7  # = MAX_PRECIP_ZOOM, gleiche Aufloesung wie die Kartenebene
@@ -221,14 +245,17 @@ def _fetch_precip_tile(frame_path: str, z: int, x: int, y: int) -> Image.Image:
     return Image.open(io.BytesIO(resp.content)).convert("RGBA")
 
 
-def _fetch_precip_overlay(center_lat: float, center_lon: float, zoom: int) -> Image.Image | None:
+def _fetch_precip_overlay(center_lat: float, center_lon: float, zoom: int, frame_path: str | None = None) -> Image.Image | None:
     """Regen/Wolken-Ebene auf EFFECTIVE_W x EFFECTIVE_H. RainViewer hat keine
     echten Kacheln jenseits von MAX_PRECIP_ZOOM (zeigt sonst nur ein 'Zoom
     Level Not Supported'-Schild) - bei staerkerem Reinzoomen wird die Ebene
     stattdessen beim naechst-groeberen unterstuetzten Zoom geholt und
     hochskaliert (dann halt etwas unscharf, aber sichtbar statt komplett
-    zu fehlen oder das Wasserzeichen zu zeigen)."""
-    precip_path = _rainviewer_frame_path()
+    zu fehlen oder das Wasserzeichen zu zeigen).
+    frame_path: expliziter RainViewer-Frame statt dem aktuellsten (JETZT-)
+    Frame - fuer die Vorhersage-Kartenseite (siehe build_forecast_frame()),
+    die einen 'nowcast'-Frame statt 'past' nutzen will."""
+    precip_path = frame_path if frame_path is not None else _rainviewer_frame_path()
     if not precip_path:
         return None
     p_zoom = min(round(zoom), MAX_PRECIP_ZOOM)  # RainViewer-Kacheln sind nur ganzzahlig zoombar
@@ -698,6 +725,66 @@ def build_frame(manual_zoom: str | float = "auto") -> RadarFrame:
     img = _draw_avatar(img, _pick_avatar_event(aircraft, warning))
 
     return RadarFrame(image=img, hits=hits, warning=warning)
+
+
+# -- Reine Niederschlags-VORHERSAGE (separat vom Live-Radar oben) -----------
+
+def _draw_forecast_badge(img: Image.Image, text: str) -> Image.Image:
+    """Gleiche Optik/Position wie _draw_zoom_badge (unten rechts), aber fuer
+    den Vorhersage-Zeitversatz ('+10 min' usw.) statt den Sichtradius -
+    dieselbe Kachel ist hier auch die manuelle 'naechster Vorhersage-Frame'-
+    Taste, siehe deckone_controller.py."""
+    x0, y0 = _cell_origin(GRID_COLS - 1, GRID_ROWS - 1)
+    rgba = img.convert("RGBA")
+    draw = ImageDraw.Draw(rgba)
+    font = _load_font(16)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    pad = 4
+    box = [x0 + TILE_PX - tw - 2 * pad, y0 + TILE_PX - th - 2 * pad, x0 + TILE_PX, y0 + TILE_PX]
+    draw.rectangle(box, fill=(0, 0, 0, 70))
+    _draw_outlined_text(draw, (box[0] + pad, box[1] + pad - bbox[1]), text, font)
+    return rgba.convert("RGB")
+
+
+def build_forecast_frame(nowcast_index: int = 0) -> RadarFrame:
+    """Reine Niederschlags-VORHERSAGE (RainViewer-Nowcast) um zuhause, OHNE
+    Flugzeuge/Blitze/Avatar - bewusst reduziert auf die eine Frage 'wohin
+    zieht der Regen als naechstes' (Nutzerwunsch: 'Kartenversion die NUR
+    Vorhersage macht', 2026-09-06). Eigene, schlanke Funktion statt build_
+    frame() mit Flags zu ueberladen - die beiden haben inhaltlich wenig
+    gemeinsam ausser derselben Karten-/Kachel-Infrastruktur.
+    nowcast_index waehlt den Frame aus _rainviewer_nowcast_frames() (0 = der
+    naechste, hoeher = weiter in der Zukunft) - kann leer sein, RainViewer
+    garantiert Nowcast-Daten nicht immer/ueberall, dann bleibt es bei der
+    Basiskarte + einem 'keine Vorhersage'-Hinweis statt zu crashen."""
+    frames = _rainviewer_nowcast_frames()
+    base, zoom, center_px = _fetch_map_for_radius(HOME_LAT, HOME_LON, DEFAULT_RADIUS_KM)
+    img = base.convert("RGB")
+
+    if frames:
+        idx = min(nowcast_index, len(frames) - 1)
+        frame = frames[idx]
+        try:
+            precip = _fetch_precip_overlay(HOME_LAT, HOME_LON, zoom, frame_path=frame["path"])
+        except Exception:
+            logger.exception("Vorhersage-Niederschlag konnte nicht geladen werden")
+            precip = None
+        if precip is not None:
+            img = img.convert("RGBA")
+            img.alpha_composite(precip)
+            img = img.convert("RGB")
+        minutes_ahead = max(0, round((frame["time"] - time.time()) / 60))
+        badge_text = f"+{minutes_ahead}min"
+    else:
+        badge_text = "keine Daten"
+
+    draw = ImageDraw.Draw(img)
+    hx, hy = _project(HOME_LAT, HOME_LON, zoom, center_px)
+    draw.ellipse([hx - 4, hy - 4, hx + 4, hy + 4], outline=(0, 255, 120), width=2)
+    img = _draw_forecast_badge(img, badge_text)
+
+    return RadarFrame(image=img, hits={}, warning=None)
 
 
 def _wind_info() -> tuple[float, float] | None:

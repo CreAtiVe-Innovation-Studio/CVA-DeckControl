@@ -165,6 +165,11 @@ ACTION_SCHEMA: dict[str, list[dict]] = {
         },
     ],
     "ha_sensor": [{"name": "entity_id", "label": "Entity-ID", "type": "text"}],
+    "weather_forecast": [
+        {"name": "entity_id", "label": "Wetter-Entity-ID", "type": "text"},
+        {"name": "forecast_type", "label": "Granularitaet", "type": "select", "options": ["daily", "hourly", "twice_daily"]},
+        {"name": "offset", "label": "Index (0 = naechster Eintrag)", "type": "number"},
+    ],
     "ha_toggle": [{"name": "entity_id", "label": "Entity-ID", "type": "text"}],
     "ha_cover": [
         {"name": "entity_id", "label": "Entity-ID", "type": "text"},

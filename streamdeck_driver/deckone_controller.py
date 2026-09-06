@@ -11,7 +11,10 @@ import time
 
 from . import actions, ha_client, hw_monitor, live_view, location_map, process_monitor, radar, timer_engine
 from .devices.deckone import DeckOne
-from .icon_render import blank_icon, render_key_icon, render_stat_card, render_timer_card, render_toggle_card, zoom_icon
+from .icon_render import (
+    blank_icon, render_key_icon, render_stat_card, render_timer_card,
+    render_toggle_card, render_weather_forecast_card, zoom_icon,
+)
 
 FLASH_DURATION_S = 0.13
 
@@ -38,6 +41,8 @@ class DeckOneController:
         self._radar_frame: radar.RadarFrame | None = None
         self._radar_zoom_idx = 0
         self._radar_info: tuple[int, dict, float] | None = None  # (key_index, aircraft, expires_at)
+        self._forecast_frame: radar.RadarFrame | None = None
+        self._forecast_idx = 0
         self._location_frame: location_map.LocationFrame | None = None
         self._location_info: tuple[int, location_map.TrackedPoint, float] | None = None
         # Schuetzt jede Sequenz aus set_key_image()-Aufrufen + end_batch() als
@@ -91,6 +96,9 @@ class DeckOneController:
             if self.active_profile == "wo_ist":
                 self._render_location_page()
                 return
+            if self.active_profile == "wetter_vorhersage":
+                self._render_forecast_page()
+                return
             keys = self._current_page_keys()
             size = self.device.info.image_size
             stats = hw_monitor.snapshot() if self.active_profile in ("system", "ki") else None
@@ -120,6 +128,24 @@ class DeckOneController:
         self._apply_radar_info_overlay()
         self.device.end_batch()
         logger.info("DECK ONE: Radar-Seite gerendert (warning=%s)", frame.warning)
+
+    def _render_forecast_page(self) -> None:
+        """Sonderfall wie _render_radar_page(): reine Niederschlags-
+        VORHERSAGE (siehe radar.py::build_forecast_frame), separat von der
+        Live-Radar-Seite - kein Flugzeug/Blitz/Avatar-Schnickschnack, nur
+        die eine Frage 'wohin zieht der Regen'."""
+        try:
+            frame = radar.build_forecast_frame(self._forecast_idx)
+        except Exception:
+            logger.exception("Vorhersage-Rendering fehlgeschlagen")
+            return
+        self._forecast_frame = frame
+        for idx, tile in radar.slice_tiles(frame).items():
+            ok = self._set_key_image(idx, tile)
+            if not ok:
+                logger.warning("DECK ONE Taste %s (Vorhersage): Bild setzen fehlgeschlagen", idx)
+        self.device.end_batch()
+        logger.info("DECK ONE: Vorhersage-Seite gerendert (Index %s)", self._forecast_idx)
 
     def _render_location_page(self) -> None:
         """Sonderfall wie _render_radar_page(): 'Wo ist?'-Seite wird als EIN
@@ -177,6 +203,8 @@ class DeckOneController:
             return self._render_stat_key(key, stats, size)
         if action_type == "ha_sensor":
             return self._render_ha_key(key, size)
+        if action_type == "weather_forecast":
+            return self._render_weather_forecast_key(key, size)
         if action_type == "timer":
             return self._render_timer_key(key, size, key_index)
         if action_type == "live_view_toggle":
@@ -229,6 +257,28 @@ class DeckOneController:
             except (TypeError, ValueError):
                 value_text = str(raw)
         return render_stat_card(size, label, value=None, unit="", value_text=value_text, color_percent=30)
+
+    def _render_weather_forecast_key(self, key: dict, size: tuple[int, int]):
+        """Vorhersage-Kachel (nicht der aktuelle Zustand wie _render_ha_key,
+        sondern ein Tag/Stunde in der Zukunft) - ueber ha_client.get_forecast()
+        (weather.get_forecasts-Service, siehe dort). offset=0 ist der naechste
+        Eintrag der jeweiligen Granularitaet, NICHT zwingend 'heute' (bei
+        forecast_type='daily' ist offset=0 je nach Integration manchmal schon
+        der Rest des heutigen Tages, manchmal schon morgen - kommt auf die
+        Wetter-Integration an)."""
+        action = key.get("action", {})
+        entity_id = action.get("entity_id", "")
+        forecast_type = action.get("forecast_type", "daily")
+        offset = int(action.get("offset", 0))
+        label = key.get("title") or key.get("name", "")
+        forecast = ha_client.get_forecast(entity_id, forecast_type)
+        if not forecast or offset >= len(forecast):
+            return render_weather_forecast_card(size, label, None, None, None)
+        entry = forecast[offset]
+        return render_weather_forecast_card(
+            size, label, entry.get("condition"),
+            entry.get("temperature"), entry.get("templow"),
+        )
 
     def _flash_key_press(self, key_index: int, key: dict, action_type: str) -> None:
         """Kurzer Zoom-Puls auf der gedrueckten Taste als visuelles Feedback -
@@ -290,7 +340,7 @@ class DeckOneController:
 
         def _run():
             while not self._refresh_stop.wait(SYSTEM_REFRESH_INTERVAL_S):
-                if self.active_profile in ("system", "ki", "home", "radar", "timer", "wo_ist") and self.device.connected:
+                if self.active_profile in ("system", "ki", "home", "radar", "timer", "wo_ist", "wetter_vorhersage") and self.device.connected:
                     try:
                         self.render_current_page()
                     except Exception:
@@ -344,6 +394,13 @@ class DeckOneController:
                         card = radar.render_info_card(ac, radar.tile_image(self._radar_frame, key_index))
                         self._set_key_image(key_index, card)
                         self.device.end_batch()
+                return
+            if self.active_profile == "wetter_vorhersage":
+                if key_index == radar.GRID_COLS * radar.GRID_ROWS - 1:  # unten rechts = naechster Vorhersage-Frame
+                    frames = radar._rainviewer_nowcast_frames()
+                    if frames:
+                        self._forecast_idx = (self._forecast_idx + 1) % len(frames)
+                    self.render_current_page()
                 return
             if self.active_profile == "wo_ist":
                 if self._location_info is not None and self._location_info[0] == key_index:

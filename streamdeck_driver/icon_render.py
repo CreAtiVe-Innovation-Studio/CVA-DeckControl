@@ -327,6 +327,87 @@ def render_stat_card(
     return img
 
 
+# -- Wettervorhersage (siehe 'weather_forecast'-Aktionstyp, ha_client.py::get_forecast) --
+
+_WEATHER_COLORS = {
+    "sunny": (60, 140, 200), "clear-night": (40, 50, 90),
+    "partlycloudy": (70, 110, 140), "cloudy": (75, 80, 90),
+    "fog": (90, 90, 95), "windy": (70, 120, 110), "windy-variant": (70, 120, 110),
+    "rainy": (30, 90, 150), "pouring": (20, 70, 140),
+    "lightning": (90, 60, 140), "lightning-rainy": (80, 50, 140),
+    "snowy": (140, 150, 170), "snowy-rainy": (100, 120, 160),
+    "hail": (120, 130, 160), "exceptional": (130, 40, 40),
+}
+_WEATHER_LABELS_DE = {
+    "sunny": "Sonnig", "clear-night": "Klar", "partlycloudy": "Wolkig",
+    "cloudy": "Bewoelkt", "fog": "Nebel", "windy": "Windig", "windy-variant": "Windig",
+    "rainy": "Regen", "pouring": "Starkregen", "lightning": "Gewitter",
+    "lightning-rainy": "Gewitter", "snowy": "Schnee", "snowy-rainy": "Schneeregen",
+    "hail": "Hagel", "exceptional": "Extrem",
+}
+
+
+def _draw_centered_outlined(draw: ImageDraw.ImageDraw, text: str, font, width: int, y: int) -> None:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    x = (width - tw) // 2 - bbox[0]
+    ty = y - bbox[1]
+    draw.text((x + 1, ty + 1), text, font=font, fill=(0, 0, 0))
+    draw.text((x, ty), text, font=font, fill=(240, 240, 245))
+
+
+def render_weather_forecast_card(
+    size: tuple[int, int], day_label: str, condition: str | None,
+    temp_high: float | None, temp_low: float | None,
+) -> Image.Image:
+    """Vorhersage-Kachel fuer den 'weather_forecast'-Aktionstyp: Tag/Zeitpunkt
+    oben, Temperatur mittig, Wetterlage unten. Eigene Farblogik statt der
+    Ampel-Prozent-Faerbung von render_stat_card (siehe _stat_color) - Regen
+    ist nicht 'schlecht' im Auslastungs-Sinn, verdient also keine rote
+    Warnfarbe wie eine ueberlastete CPU."""
+    w, h = size
+    color = _WEATHER_COLORS.get(condition, (70, 70, 76))
+    top = tuple(min(255, c + 25) for c in color)
+    bottom = tuple(max(0, c - 15) for c in color)
+
+    margin = max(2, int(min(w, h) * 0.035))
+    radius = max(6, int(min(w, h) * 0.14))
+
+    img = Image.new("RGB", (w, h), (8, 8, 10))
+    card = _gradient_bg((w - 2 * margin, h - 2 * margin), top, bottom)
+    mask = Image.new("L", card.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, card.size[0] - 1, card.size[1] - 1], radius=radius, fill=255)
+    img.paste(card, (margin, margin), mask)
+    draw = ImageDraw.Draw(img)
+
+    if temp_high is not None and temp_low is not None:
+        value_text = f"{temp_low:.0f}°/{temp_high:.0f}°"
+    elif temp_high is not None:
+        value_text = f"{temp_high:.0f}°"
+    else:
+        value_text = "--"
+    value_font_size = max(14, int(min(w, h) * 0.22))
+    value_font = _load_font(value_font_size)
+    bbox = draw.textbbox((0, 0), value_text, font=value_font)
+    while bbox[2] - bbox[0] > w - 2 * margin - 6 and value_font_size > 9:
+        value_font_size -= 1
+        value_font = _load_font(value_font_size)
+        bbox = draw.textbbox((0, 0), value_text, font=value_font)
+    vw, vh = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    vx, vy = (w - vw) // 2 - bbox[0], int(h * 0.42) - vh // 2 - bbox[1]
+    draw.text((vx + 1, vy + 1), value_text, font=value_font, fill=(0, 0, 0))
+    draw.text((vx, vy), value_text, font=value_font, fill=(255, 255, 255))
+
+    day_font = _load_font(max(9, int(min(w, h) * 0.12)))
+    _draw_centered_outlined(draw, day_label.upper(), day_font, w, margin + int(h * 0.06))
+
+    cond_label = _WEATHER_LABELS_DE.get(condition, condition or "")
+    cond_font = _load_font(max(8, int(min(w, h) * 0.10)))
+    _draw_centered_outlined(draw, cond_label.upper(), cond_font, w, h - margin - int(h * 0.16))
+
+    return img
+
+
 # -- Timer/Stopwatch (siehe timer_engine.py fuer den Zustandsautomaten) ------
 
 _TIMER_PHASE_COLORS = {

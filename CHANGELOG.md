@@ -2,6 +2,22 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.0] - 2026-09-06
+
+### Added
+- **Weather forecast tiles**: a new `weather_forecast` action type showing
+  temperature/condition for any day or hour ahead, via Home Assistant's
+  `weather.get_forecasts` service. Tested against live forecast data.
+- **Rain forecast map**: a new `wetter_vorhersage` profile, built like the
+  radar but stripped down to show only RainViewer's precipitation
+  *forecast* (nowcast, next ~30-60 min) with no live traffic/lightning.
+  Shows a "no data" placeholder when RainViewer has no forecast frames for
+  the current location/time, rather than an empty or broken map - tested
+  against the live API, but the actual forecast overlay itself couldn't be
+  verified against real rain (none was forecast at the time).
+- `ha_client.py::get_forecast()`: new helper for the above, 15-minute
+  cached.
+
 ## [1.1.0] - 2026-09-06
 
 ### Added

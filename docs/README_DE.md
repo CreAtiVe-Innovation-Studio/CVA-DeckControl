@@ -33,6 +33,12 @@ einfach Spaß gemacht hat, die Hardware selbst anzusprechen.
   Kartenbild in Kacheln zerschnitten), zeigt getrackte Personen über Home
   Assistant mit automatischer Zoom-Anpassung — getestet, aber nicht
   ausgiebig (siehe eigener Abschnitt unten)
+- **Regen-Vorhersage-Karte**: eine eigene, reduzierte Kartenseite die nur
+  RainViewers Niederschlags-*Vorhersage* zeigt (nächste ~30-60min), ohne
+  Flugverkehr/Blitz-Schnickschnack — getestet, aber nicht ausgiebig
+- **Wettervorhersage-Kacheln**: ein `weather_forecast`-Aktionstyp für
+  einfache Vorhersage-Karten pro Taste (Temperatur/Wetterlage, beliebiger
+  Tag/Stunde im Voraus), über Home Assistants Vorhersage-Service
 - Aktionstypen: Hotkeys, Programme/URLs öffnen, App-Lautstärke, Live-System-
   Kennzahlen (CPU/RAM/GPU), Home-Assistant-Steuerung, uvm. — volle Liste in
   [SEITEN-LOGIK.md](../SEITEN-LOGIK.md)
@@ -214,6 +220,28 @@ Koordinaten hat. Ohne eingerichteten Tracker zeigt die Seite eine
 "Keine Tracker gefunden"-Karte statt einer leeren oder kaputten Karte. Eine
 Pin-Taste antippen zeigt Name/Entfernung/Richtung von zuhause; nochmal
 antippen blendet es wieder aus.
+
+## Wettervorhersage
+
+**Getestet, aber nicht ausgiebig** — gleicher Vorbehalt wie bei der
+Standort-Karte: gegen echte Daten geprüft, aber nicht über einen längeren
+Zeitraum. Falls etwas komisch aussieht, bitte ein Issue aufmachen.
+
+Zwei unabhängige Teile, beide über Home Assistants Wettervorhersage-Service
+(keine zusätzliche Einrichtung nötig außer `config/ha_secrets.yaml` und
+einer `weather.*`-Entity — derselben, die HA für die eigene Vorhersage-
+Karte nutzt):
+
+- **`weather_forecast`-Aktionstyp** — eine einfache Karte pro Taste (siehe
+  [SEITEN-LOGIK.md](../SEITEN-LOGIK.md) Abschnitt 4.10) mit Temperatur und
+  Wetterlage für einen beliebigen Tag/Stunde im Voraus.
+- **`wetter_vorhersage`-Profil** — eine eigene Kartenseite (eigenes Profil,
+  nicht Teil des Radars), die *nur* RainViewers Niederschlags-Vorhersage
+  zeigt (die nächsten ~30-60 Minuten, in ~10-Minuten-Schritten), ohne
+  Flugverkehr/Blitze drauf. Taste unten rechts wechselt durch die
+  verfügbaren Vorhersage-Frames. RainViewer garantiert Vorhersage-Daten
+  nicht für jeden Ort/Zeitpunkt — die Seite zeigt dann "keine Daten" statt
+  einer leeren oder kaputten Karte.
 
 ## Plattform-Unterstützung
 
