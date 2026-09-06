@@ -2,6 +2,21 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.6.0] - 2026-09-06
+
+### Added
+- `auto_profile_switch`: optional automatic DECK ONE profile switching based
+  on the currently focused application, configured as a top-level
+  `profiles.yaml` key (`apps: {app-id-substring: profile}`). Only fires on
+  an actual focus change, never repeatedly, so it doesn't fight a manual
+  profile switch made while the same app stays focused. Off by default.
+  Active-app detection is platform-specific
+  (`platform_backend.get_active_app_id()`): on Linux/Wayland it needs the
+  GNOME Shell extension "Window Calls" (falls back to inactive, logged
+  once, on KDE/Sway/without it); Windows and macOS backends are
+  implemented but, like the rest of `platform_backend`, untested on real
+  hardware.
+
 ## [1.5.0] - 2026-09-06
 
 ### Added

@@ -119,3 +119,18 @@ def show_message_popup(title: str, text: str) -> None:
         subprocess.Popen(["osascript", "-e", script])
     except (subprocess.SubprocessError, FileNotFoundError) as exc:
         logger.error("Popup-Anzeige fehlgeschlagen: %s", exc)
+
+
+def get_active_app_id() -> str | None:  # UNGETESTET
+    """Liefert den Namen der vordergruendigen App (kleingeschrieben), z.B.
+    'firefox' oder 'code' - fuer automatischen Profilwechsel je nach aktiver
+    App (window_watch.py). 'System Events'/frontmost ist die uebliche,
+    stabile AppleScript-Standardtechnik dafuer - kein zusaetzliches pyobjc
+    noetig (das ist keine Kern-Abhaengigkeit dieses Projekts)."""
+    script = 'tell application "System Events" to get name of first application process whose frontmost is true'
+    try:
+        result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=3, check=True)
+        return result.stdout.strip().lower() or None
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        logger.warning("Aktive App nicht ermittelbar: %s", exc)
+        return None

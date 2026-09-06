@@ -5,6 +5,17 @@
 #
 # Volle Feld-Referenz + Kochrezepte fuer neue Tasten/Seiten/Profile: siehe
 # SEITEN-LOGIK.md.
+# Automatischer DECK-ONE-Profilwechsel je nach aktiver App - komplett optional,
+# siehe SEITEN-LOGIK.md Abschnitt 4.13. Ohne diesen Block (oder enabled: false)
+# passiert nichts anders als vorher. Schluessel unter 'apps' sind Teilstrings
+# der App-Kennung (wm_class unter Linux, Prozessname unter Windows, App-Name
+# unter macOS), klein geschrieben, Teilstring-Vergleich.
+auto_profile_switch:
+  enabled: false
+  poll_interval_s: 3
+  apps:
+    obs: streaming
+    firefox: buero
 version: 1
 elgato:
   pages:

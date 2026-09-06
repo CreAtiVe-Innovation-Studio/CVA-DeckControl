@@ -40,3 +40,7 @@ def play_sound(path: Path) -> None:
 
 def show_message_popup(title: str, text: str) -> None:
     _warn("Popup-Anzeige")
+
+
+def get_active_app_id() -> str | None:
+    return None

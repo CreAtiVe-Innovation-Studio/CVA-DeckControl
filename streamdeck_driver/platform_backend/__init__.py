@@ -45,3 +45,4 @@ take_screenshot_interactive = backend.take_screenshot_interactive
 set_app_volume = backend.set_app_volume
 play_sound = backend.play_sound
 show_message_popup = backend.show_message_popup
+get_active_app_id = backend.get_active_app_id

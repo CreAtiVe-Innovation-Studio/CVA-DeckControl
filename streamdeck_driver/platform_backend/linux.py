@@ -3,6 +3,7 @@ Umbau, nur aus actions.py/process_monitor.py/timer_engine.py hierher verschoben.
 Getestet gegen echte Hardware (siehe SEITEN-LOGIK.md / CLAUDE.md-Historie)."""
 from __future__ import annotations
 
+import json
 import logging
 import re
 import shlex
@@ -127,3 +128,54 @@ def show_message_popup(title: str, text: str) -> None:
         subprocess.Popen(["zenity", "--info", f"--title={title}", f"--text={text}", "--width=320"])
     except (subprocess.SubprocessError, FileNotFoundError) as exc:
         logger.error("zenity-Anzeige fehlgeschlagen: %s", exc)
+
+
+_window_calls_warned = False
+
+
+def get_active_app_id() -> str | None:
+    """Liefert die wm_class des aktuell fokussierten Fensters (klein-
+    geschrieben), z.B. 'firefox' oder 'code' - fuer automatischen Profil-
+    wechsel je nach aktiver App (window_watch.py). Braucht die GNOME-Shell-
+    Erweiterung 'Window Calls' (window-calls@domandoman.xyz,
+    https://github.com/ickyicky/window-calls): unter Wayland gibt es sonst
+    KEINEN verlaesslichen, erweiterungsfreien Weg an das fokussierte Fenster
+    heranzukommen (die alten X11-Tools xdotool/wmctrl funktionieren unter
+    Wayland nicht, und GNOME Shells D-Bus-Eval() ist seit GNOME 41 per
+    Default deaktiviert - siehe Systemd/systemctl-Recherche, live gegen die
+    eigene GNOME/Wayland-Session verifiziert). Auf KDE/Sway/anderen
+    Compositors oder ohne die Erweiterung liefert das hier None (einmalig
+    geloggt) - dann bleibt die automatische Profilumschaltung einfach aus,
+    kein Fehler.
+
+    Bewusst NUR wm_class, NIE der Fenstertitel: der Titel kann sensible
+    Inhalte enthalten (Suchbegriffe, Chat-Vorschauen), wm_class ist nur die
+    App-Kennung."""
+    global _window_calls_warned
+    try:
+        result = subprocess.run(
+            [
+                "busctl", "--user", "--json=short", "call",
+                "org.gnome.Shell", "/org/gnome/Shell/Extensions/Windows",
+                "org.gnome.Shell.Extensions.Windows", "List",
+            ],
+            capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode != 0:
+            if not _window_calls_warned:
+                logger.warning(
+                    "Aktive App nicht ermittelbar - GNOME-Erweiterung 'Window Calls' fehlt/deaktiviert "
+                    "oder kein GNOME (%s). Automatischer Profilwechsel bleibt aus.",
+                    result.stderr.strip(),
+                )
+                _window_calls_warned = True
+            return None
+        envelope = json.loads(result.stdout)
+        windows = json.loads(envelope["data"][0])
+        focused = next((w for w in windows if w.get("focus")), None)
+        return focused["wm_class"].lower() if focused else None
+    except (subprocess.SubprocessError, FileNotFoundError, ValueError, KeyError) as exc:
+        if not _window_calls_warned:
+            logger.warning("Aktive App nicht ermittelbar: %s. Automatischer Profilwechsel bleibt aus.", exc)
+            _window_calls_warned = True
+        return None

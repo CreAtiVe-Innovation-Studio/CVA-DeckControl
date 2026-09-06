@@ -13,6 +13,8 @@ import shlex
 import subprocess
 from pathlib import Path
 
+import psutil
+
 logger = logging.getLogger("streamdeck_driver.platform_backend.windows")
 
 # -- Hotkey-Injection per SendInput (ctypes) ---------------------------------
@@ -190,3 +192,25 @@ def show_message_popup(title: str, text: str) -> None:
         ctypes.windll.user32.MessageBoxW(0, text, title, 0)
     except OSError as exc:
         logger.error("Popup-Anzeige fehlgeschlagen: %s", exc)
+
+
+def get_active_app_id() -> str | None:  # UNGETESTET
+    """Liefert den Prozessnamen (ohne '.exe', kleingeschrieben) des Fensters
+    im Vordergrund, z.B. 'firefox' oder 'code' - fuer automatischen Profil-
+    wechsel je nach aktiver App (window_watch.py). GetForegroundWindow() +
+    GetWindowThreadProcessId() sind Standard-Win32 (user32), psutil (bereits
+    Kern-Abhaengigkeit) loest die PID zum Prozessnamen auf - keine
+    Zusatz-Abhaengigkeit noetig, anders als set_app_volume()/pycaw."""
+    try:
+        hwnd = ctypes.windll.user32.GetForegroundWindow()
+        if not hwnd:
+            return None
+        pid = ctypes.c_ulong()
+        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return None
+        name = psutil.Process(pid.value).name()
+        return name[:-4].lower() if name.lower().endswith(".exe") else name.lower()
+    except (OSError, psutil.Error) as exc:
+        logger.warning("Aktive App nicht ermittelbar: %s", exc)
+        return None

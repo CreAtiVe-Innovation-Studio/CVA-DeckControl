@@ -324,6 +324,85 @@ deckone:
         keys: {}    # bleibt leer, wird komplett prozedural gerendert
 ```
 
+### 4.12 `action_long` - anderes Verhalten bei langem Tastendruck
+
+```yaml
+0:
+  name: Mikro
+  title: Mikro
+  action:
+    type: app_volume
+    app_name: mikrofon
+    direction: down
+  action_long:
+    type: open_gui
+```
+
+Optionales zweites `action:`-Objekt auf JEDER Taste (jeder Aktions-Typ aus
+diesem Abschnitt 4 ist erlaubt, auch als `action_long`). Ab
+`LONG_PRESS_THRESHOLD_S` (0.6s, `deckone_controller.py`) Haltedauer zwischen
+Druecken und Loslassen wird `action_long` statt `action` ausgeloest -
+darunter (oder wenn `action_long` fehlt) ganz normal `action`.
+
+**Wichtige Verhaltensaenderung, die das mit sich bringt**: die Aktion wird
+jetzt beim LOSLASSEN ausgeloest, nicht mehr beim Druecken - vorher war es
+umgekehrt. Bei normalen (kurzen) Druecken ist der Unterschied nur
+Sekundenbruchteile und in der Praxis nicht spuerbar, aber wichtig zu wissen,
+falls man den Code liest oder eigene Timing-Annahmen hat. Der Zoom-Puls
+(visuelles Feedback) bleibt bewusst auf dem Druecken selbst - nur die
+eigentliche Aktion wartet aufs Loslassen.
+
+Gilt nur fuer normale YAML-Tasten, NICHT fuer die prozedural gerenderten
+Sonderseiten (`radar`, `wetter_vorhersage`, `wo_ist`) - deren eigene
+Tasten (Zoom-Zyklus, Info-Karten-Toggle) reagieren weiterhin wie bisher
+direkt beim Druecken, ohne lang/kurz-Unterscheidung.
+
+---
+
+### 4.13 `auto_profile_switch` - automatischer Profilwechsel je nach aktiver App
+
+Kein `action`-Feld, sondern ein eigener TOP-LEVEL-Schluessel in
+`profiles.yaml` (Geschwister von `elgato:`/`deckone:`, nicht darunter):
+
+```yaml
+auto_profile_switch:
+  enabled: true
+  poll_interval_s: 3
+  apps:
+    obs: streaming
+    firefox: buero
+```
+
+`apps` bildet einen Teilstring der App-Kennung auf einen DECK-ONE-Profilnamen
+ab (Schluessel des jeweiligen Profils unter `deckone.profiles`). Alle
+`poll_interval_s` Sekunden wird die aktuell fokussierte App abgefragt
+(`platform_backend.py::get_active_app_id()`); wechselt sie zu einer neu
+zugeordneten App, schaltet DECK ONE automatisch auf das passende Profil um -
+wie ein automatisch ausgeloester `switch_profile`-Tastendruck.
+
+**Flanken-, kein Dauer-Trigger**: die Umschaltung passiert nur GENAU EINMAL
+beim Fokuswechsel, nicht bei jeder Abfrage erneut. Schaltet man danach von
+Hand (Elgato Mini) auf ein anderes Profil, bleibt das so bestehen, solange
+dieselbe App weiter fokussiert ist - erst der naechste Fokuswechsel auf eine
+andere zugeordnete App loest wieder eine automatische Umschaltung aus. Ohne
+diese Regel wuerde jede manuelle Wahl beim naechsten Poll sofort wieder
+ueberschrieben.
+
+**Plattform-Einschraenkung (wichtig unter Linux)**: `get_active_app_id()`
+braucht unter Wayland/GNOME die GNOME-Shell-Erweiterung "Window Calls"
+(`window-calls@domandoman.xyz`, https://github.com/ickyicky/window-calls) -
+es gibt sonst keinen verlaesslichen, erweiterungsfreien Weg an das
+fokussierte Fenster heran (X11-Tools wie xdotool/wmctrl funktionieren unter
+Wayland nicht). Fehlt die Erweiterung oder laeuft eine andere Desktop-
+Umgebung (KDE, Sway, ...), wird das einmalig geloggt und das Feature bleibt
+inaktiv, kein Fehler/Absturz. Windows (`GetForegroundWindow` + psutil) und
+macOS (AppleScript/System Events) sind analog implementiert, aber wie der
+Rest von `platform_backend/windows.py`/`macos.py` UNGETESTET.
+
+Bewusst wird nur die App-Kennung (Linux: `wm_class`, Windows: Prozessname,
+macOS: App-Name) ausgewertet, NIE der Fenstertitel - der kann sensible
+Inhalte wie Suchbegriffe oder Chat-Vorschauen enthalten.
+
 ---
 
 ## 5. Icons (`icon:`-Feld pro Taste)
@@ -398,6 +477,28 @@ der bestehenden Config). Farblogik (`_stat_color()`):
 
 Zusaetzlich ein 120-Sekunden-Sparkline-Verlauf im Kartenhintergrund
 (`hw_monitor.get_recent_values()`/`rolling_average()`).
+
+### 5.5 Fehler-Badge - sichtbare Warnung statt stillem Log-Eintrag
+
+Wenn die letzte Anfrage an Home Assistant fehlgeschlagen ist, bekommen alle
+HA-abhaengigen Kacheln automatisch eine kleine rote Kreis-Badge mit `!` oben
+rechts ueberblendet (`icon_render.py::add_error_badge()`), statt dass der
+Fehler nur im Log landet und die Kachel weiterhin harmlos `--`/den letzten
+bekannten Zustand zeigt. Betroffen: `ha_sensor`, `weather_forecast`,
+`ha_toggle`, `ha_cover` (`deckone_controller.py::_render_ha_key()` /
+`_render_weather_forecast_key()` / `_render_key_icon_for()`).
+
+Die Erkennung laeuft ueber `ha_client.py::is_healthy()` - ein modulweiter
+Merker, der bei jeder Art von HA-API-Aufruf (Zustaende lesen, Service
+aufrufen, Vorhersage holen) auf `True`/`False` gesetzt wird, je nachdem ob
+die letzte Anfrage erfolgreich war. Kein separater Health-Check-Call noetig,
+kein Timeout-Grace-Fenster - sobald der naechste HA-Aufruf (egal welcher)
+wieder klappt, verschwindet die Badge beim naechsten Rendern von selbst.
+
+Andere Fehlerquellen (fehlgeschlagener Hotkey, `open`-Befehl nicht gefunden
+usw.) loesen aktuell weiterhin nur einen Log-Eintrag aus, keine Badge - das
+sind einmalige Fire-and-Forget-Aktionen ohne eine dauerhaft angezeigte
+"Live"-Kachel, auf der eine Badge sinnvoll haengen bleiben koennte.
 
 ---
 
