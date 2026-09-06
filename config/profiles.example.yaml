@@ -37,6 +37,14 @@ elgato:
             profile: musik
           icon:
             type: generated
+        2:
+          name: Open
+          title: Farbschema
+          action:
+            type: switch_profile
+            profile: farbschema
+          icon:
+            type: generated
         5:
           name: Naechste Seite
           title: ''
@@ -153,5 +161,42 @@ deckone:
               type: app_volume
               app_name: spotify
               direction: down
+            icon:
+              type: generated
+    # Kochrezept "mehrere Tasten rufen denselben externen Befehl mit
+    # unterschiedlichem Argument auf" - braucht KEINEN eigenen Action-Type,
+    # der ganz normale 'open'-Typ reicht (siehe SEITEN-LOGIK.md Abschnitt
+    # 4.2). Hier als Farbschema-Umschalter, genauso gut fuer z.B. einen
+    # eigenen Desktop-Theme-Switcher, unterschiedliche Monitor-Layouts o.ae. -
+    # eigenes Skript schreiben, das den gewuenschten Zustand anhand des
+    # uebergebenen Arguments setzt, dann pro Option eine Taste mit demselben
+    # Skript-Pfad aber anderem Argument.
+    farbschema:
+      color: '#94A3B8'
+      pages:
+      - name: Farbschema
+        keys:
+          0:
+            name: Hell
+            title: Hell
+            action:
+              type: open
+              linux_command: /home/DEINNAME/skripte/farbschema-setzen hell
+            icon:
+              type: generated
+          1:
+            name: Dunkel
+            title: Dunkel
+            action:
+              type: open
+              linux_command: /home/DEINNAME/skripte/farbschema-setzen dunkel
+            icon:
+              type: generated
+          2:
+            name: Kontrast
+            title: Kontrast
+            action:
+              type: open
+              linux_command: /home/DEINNAME/skripte/farbschema-setzen kontrast
             icon:
               type: generated

@@ -177,6 +177,14 @@ also keine Pipes/Env-Vars im Befehl). Alte Manifest-Felder wie
 reine Doku-Reste aus dem Windows-Import und werden zur Laufzeit ignoriert
 (nur `linux_command` zaehlt).
 
+**Kochrezept: mehrere Tasten schalten zwischen mehreren Zustaenden um**
+(z.B. Farbschema/Desktop-Theme/Monitor-Layout) - braucht KEINEN eigenen
+Action-Type, `open` reicht: ein eigenes Skript schreiben, das den
+gewuenschten Zustand anhand eines Kommandozeilen-Arguments setzt, dann pro
+Option eine Taste mit demselben Skript-Pfad, aber jeweils anderem Argument
+in `linux_command`. Beispiel (Farbschema-Umschalter mit 3 Optionen) siehe
+`profiles.example.yaml` unter `deckone.profiles.farbschema`.
+
 ### 4.3 `open_sequence` - mehrere Programme nacheinander
 
 ```yaml
