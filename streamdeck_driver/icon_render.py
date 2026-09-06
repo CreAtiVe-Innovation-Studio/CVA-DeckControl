@@ -793,11 +793,15 @@ def render_key_icon(icon_def: dict, size: tuple[int, int], title: str, action_ty
             return img.resize(size)
     # Generisches KI-generiertes Icon je Aktionstyp (hotkey/website/Seitenwechsel/...)
     # als Fallback, bevor auf das gezeichnete Vektor-Icon zurueckgefallen wird.
-    # (profilspezifische Symbole bei switch_profile gibt es nur im gezeichneten
-    # Vektor-Icon, nicht ueber diesen Datei-Fallback - waere pro Profil eine
-    # eigene PNG, lohnt sich nicht neben der Keyword-Symbolwahl unten.)
+    # switch_profile bewusst AUSGENOMMEN: eine einzelne "switch_profile.png"
+    # kann niemals nach Ziel-Profil variieren (genau der Bug, live gemeldet -
+    # ALLE Profil-Wechsel-Tasten sahen trotz der neuen Keyword-Symbole unten
+    # weiterhin identisch aus, weil diese eine statische Datei sie schon
+    # abgefangen hat, bevor render_generated_icon() ueberhaupt lief). Fuer
+    # switch_profile geht es deshalb IMMER direkt zum gezeichneten,
+    # profilspezifischen Symbol weiter.
     generic_path = GENERATED_ICON_DIR / f"{action_type}.png"
-    if action_type and generic_path.exists():
+    if action_type and action_type != "switch_profile" and generic_path.exists():
         return render_app_icon_card(size, generic_path, title)
     return render_generated_icon(size, title, action_type, profile)
 

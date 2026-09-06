@@ -2,6 +2,19 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.1] - 2026-09-06
+
+### Fixed
+- v1.7.0's per-profile `switch_profile` icons had no effect if a generic
+  `switch_profile.png` existed under `assets/generated-icons/` (e.g. from
+  an earlier icon-generation run) - that static file was always used
+  before `render_generated_icon()` got a chance to run, so every
+  profile-switch tile kept looking identical despite the new per-profile
+  symbols. `switch_profile` now always goes through the procedurally drawn
+  icon instead. Verified against all 16 real profile-switch keys in the
+  live config - previously all 16 shared one static icon, now every one
+  renders distinctly.
+
 ## [1.7.0] - 2026-09-06
 
 ### Added
