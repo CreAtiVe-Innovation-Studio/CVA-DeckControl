@@ -88,11 +88,12 @@ in einem Schritt (überschreibt nie bestehende `config/*.yaml`). Danach:
 ```
 
 **Windows:** entweder Python selbst installieren + `pip install -r requirements.txt`,
-oder die fertig gebaute `.exe` nehmen (kein Python nötig) — siehe
-"Fertige Windows-.exe" unten. Zum SELBER bauen: `tools\build_windows_exe.bat`
-(braucht Python im PATH) — der Build-Pfad ist live gegen echte Hardware
-verifiziert (beide Geräte verbinden, Icons/Config laden korrekt, Autostart
-funktioniert).
+oder unter [Releases](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
+nach einer fertig gebauten `.exe` schauen (kein Python nötig) — siehe
+"Fertige Windows-.exe" unten für den aktuellen Stand. Zum SELBER bauen:
+`tools\build_windows_exe.bat` (braucht Python im PATH) — der Build-Pfad ist
+live gegen echte Hardware verifiziert (beide Geräte verbinden, Icons/Config
+laden korrekt, Autostart funktioniert).
 
 **Manuell (jede Plattform):**
 1. `pip install -r requirements.txt`
@@ -115,10 +116,10 @@ funktioniert).
 
 Der komplette Quellcode hier ist für nicht-kommerzielle Nutzung frei (siehe
 "Lizenz" unten) — jede:r kann sich mit `tools\build_windows_exe.bat` selbst
-eine `.exe` bauen, kostet nichts. Wer das nicht selbst machen will/kann:
-eine fertig gebaute .exe gibt es direkt unter
-[Releases](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
-— ohne Umweg, genau wie beim Selberbauen. Wer das Projekt trotzdem
+eine `.exe` bauen, kostet nichts. Eine fertig gebaute `.exe` soll als Anhang
+an einen [Release](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
+kommen — dort zuerst nachschauen; hängt (noch) keine dran, ist Selberbauen
+schnell erledigt und genauso ohne Umweg. Wer das Projekt trotzdem
 unterstützen möchte: es gibt ein optionales
 [Buy Me a Coffee](https://buymeacoffee.com/creativeinw) — komplett
 freiwillig, an nichts gekoppelt.
