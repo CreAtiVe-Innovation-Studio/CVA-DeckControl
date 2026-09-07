@@ -85,11 +85,12 @@ one step (never overwrites an existing `config/*.yaml`). Then:
 ```
 
 **Windows:** either install Python yourself + `pip install -r requirements.txt`,
-or check [Releases](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
-for a prebuilt `.exe` (no Python needed) — see "Prebuilt Windows .exe"
-below for the current status. To build it YOURSELF: `tools\build_windows_exe.bat`
-(needs Python on PATH) — the build path is verified live against real
-hardware (both devices connect, icons/config load correctly, autostart works).
+or grab the prebuilt `.exe` (no Python needed) from
+[Releases](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
+— see "Prebuilt Windows .exe" below. To build it YOURSELF:
+`tools\build_windows_exe.bat` (needs Python on PATH) — the build path is
+verified live against real hardware (both devices connect, icons/config
+load correctly, autostart works).
 
 **Manual (any platform):**
 1. `pip install -r requirements.txt`
@@ -112,11 +113,12 @@ hardware (both devices connect, icons/config load correctly, autostart works).
 
 The complete source code here is free for non-commercial use (see
 "License" below) — anyone can build their own `.exe` with
-`tools\build_windows_exe.bat`, at no cost. A prebuilt `.exe` is planned to
-be attached to a [Release](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
-— check there first; if none is attached yet, building your own is quick
-and no strings attached either way. If you'd like to support the project
-anyway, there's an optional
+`tools\build_windows_exe.bat`, at no cost. A prebuilt `.exe` is attached
+directly to each [Release](https://github.com/CreAtiVe-Innovation-Studio/CVA-DeckControl/releases)
+as a zip (`CVA-DeckControl.exe` + its `_internal\` dependencies folder —
+both need to stay together, unzip and keep them side by side) — no strings
+attached, same as building it yourself. If you'd like to support the
+project anyway, there's an optional
 [Buy Me a Coffee](https://buymeacoffee.com/creativeinw) — entirely
 voluntary, not tied to the download in any way.
 
