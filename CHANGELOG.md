@@ -2,6 +2,16 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.8.1] - 2026-09-08
+
+### Added
+- Radar auto-zoom now recognizes a nearby low-flying helicopter (checked
+  before landing-approach/storm detection) and zooms in tighter than the
+  previous 5km floor - down to 1.5km for one directly overhead - so it's
+  actually visible on the small map instead of a barely-visible dot.
+  Manual zoom (button on the radar page) also got a tighter 2km step for
+  the same reason.
+
 ## [1.8.0] - 2026-09-08
 
 ### Changed

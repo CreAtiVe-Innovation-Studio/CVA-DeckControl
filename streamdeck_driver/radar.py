@@ -85,6 +85,12 @@ FORECAST_RADIUS_KM = 20.0  # Nutzerwunsch 2026-09-08: weiter rausgezoomt als
 APPROACH_MIN_RADIUS_KM = 5.0
 APPROACH_MAX_RADIUS_KM = 40.0
 STORM_BANDS_KM = [(5, 5), (10, 10), (20, 20), (30, 30)]  # (Schwelle, Ziel-Radius)
+HELI_DETECT_RADIUS_KM = 8.0  # deckungsgleich mit AVATAR_LOCAL_RADIUS_KM weiter
+# unten - "tatsaechlich in Kartennaehe", nicht irgendwo im 60km-Suchradius
+HELI_MIN_RADIUS_KM = 1.5  # Nutzerwunsch 2026-09-08: bei einem Tiefueberflug
+# naeher heranzoomen duerfen als der sonstige 5km-Ausgangssicht-Boden
+# (APPROACH_MIN_RADIUS_KM) - ein Heli direkt ueberm Haus soll auch wirklich
+# gross auf der kleinen Karte zu sehen sein, nicht nur als winziger Punkt.
 
 _tile_cache: dict[tuple[int, int, int], Image.Image] = {}
 
@@ -441,6 +447,26 @@ def _find_approach(aircraft: list[dict]):
     return None, None
 
 
+def _find_nearby_heli(aircraft: list[dict]):
+    """Naechstgelegener Helikopter innerhalb HELI_DETECT_RADIUS_KM, oder
+    None - fuer den Tiefueberflug-Zoom in _decide_view(). Anders als
+    _find_approach() KEINE Anflug-/Kurs-/Sinkflug-Bedingungen: ein Heli in
+    Kartennaehe ist schon fuer sich genommen interessant genug (typischer
+    Fall: Polizei/Rettungshubschrauber im Tiefflug), nicht nur wenn er
+    Richtung Flughafen unterwegs ist."""
+    best, best_dist = None, None
+    for ac in aircraft:
+        lat, lon = ac.get("lat"), ac.get("lon")
+        if lat is None or lon is None or _aircraft_shape(ac.get("category")) != "heli":
+            continue
+        dist = _haversine_km(lat, lon, HOME_LAT, HOME_LON)
+        if dist > HELI_DETECT_RADIUS_KM:
+            continue
+        if best_dist is None or dist < best_dist:
+            best, best_dist = ac, dist
+    return (best, best_dist) if best is not None else (None, None)
+
+
 def _altitude_color(alt) -> tuple[int, int, int]:
     if not isinstance(alt, (int, float)):
         return (170, 170, 170)
@@ -583,6 +609,13 @@ def _decide_view(aircraft: list[dict]):
     """Zentrum ist IMMER zuhause (Am Ueling) - die Karte darf nie wegwandern,
     nur der Radius (Zoom) passt sich an, damit es sich nicht wie ein
     staendiges Verschieben anfuehlt, sondern wie ein ruhiges Rein-/Rauszoomen."""
+    heli_ac, heli_dist = _find_nearby_heli(aircraft)
+    if heli_ac is not None:
+        # Zuerst gecheckt (vor Landeanflug/Gewitter) - ein Heli im Tiefflug
+        # direkt in der Naehe ist das unmittelbarste der drei Ereignisse,
+        # darf also nicht von einem weiter entfernten Anflug ueberdeckt werden.
+        radius = max(HELI_MIN_RADIUS_KM, heli_dist * 1.5)
+        return HOME_LAT, HOME_LON, radius, "Helikopter im Tiefflug"
     approach_ac, airport = _find_approach(aircraft)
     if approach_ac is not None:
         dist_home = _haversine_km(HOME_LAT, HOME_LON, approach_ac["lat"], approach_ac["lon"])
@@ -601,7 +634,7 @@ def _decide_view(aircraft: list[dict]):
 # deckone_controller.py) - "auto" gibt die normale _decide_view-Logik frei,
 # ein Zahlenwert erzwingt einen festen Radius (immer noch zentriert auf
 # Zuhause) bis wieder auf "auto" weitergeschaltet wird.
-ZOOM_CYCLE: list[str | float] = ["auto", 5.0, 10.0, 20.0, 40.0]
+ZOOM_CYCLE: list[str | float] = ["auto", 2.0, 5.0, 10.0, 20.0, 40.0]
 
 
 def _latlon_from_pixel(x: float, y: float, zoom: int) -> tuple[float, float]:
