@@ -2,6 +2,21 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.8.2] - 2026-09-08
+
+### Fixed
+- `tools/mathlern_layout.py`: a stray keystroke bug reported live (typing
+  produced garbled digit sequences instead of normal text after using this
+  key). Root cause: the script's raw-`ydotool`-keycode fallback (used only
+  if the GNOME "Window Calls" D-Bus extension was unavailable) had no
+  protection against overlapping runs - pressing the key again while a
+  run was still in progress launched a second instance, and their
+  press/release events could interleave through `ydotoold`, leaving a
+  modifier key (Shift/Super) stuck down at the kernel level. Removed the
+  fallback entirely (the D-Bus extension has been reliably active on this
+  system throughout) and added a non-blocking lock so a second press
+  while one run is in progress is ignored instead of stacking.
+
 ## [1.8.1] - 2026-09-08
 
 ### Added

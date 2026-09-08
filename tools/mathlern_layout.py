@@ -6,14 +6,24 @@ Extension (D-Bus org.gnome.Shell.Extensions.Windows, Pfad
   - linker Bildschirm (2560x1440 @ 0,0):            /mission (voll)
   - rechter Bildschirm (1920x1080 @ 2560,64), nur linke Haelfte: /admin/schueler
 
-Faellt automatisch auf die alte Tastenkuerzel-Simulation zurueck (Super+Pfeil
-via ydotool), falls die Extension noch nicht aktiv ist (braucht nach der
-Installation einmalig Ab-/Anmelden, da GNOME unter Wayland Extensions nicht
-live nachladen kann).
-"""
+BUG GEFUNDEN 2026-09-08 (live gemeldet: statt des Layouts tippte der Nutzer
+danach staendig Zahlenfolgen in andere Fenster): dieses Skript hatte einen
+Fallback auf rohe ydotool-Tastencode-Injektion (Super+Pfeil etc.), falls der
+D-Bus-Weg fehlschlug. Bei mehrfachem Tastendruck (z.B. weil es augenscheinlich
+nicht reagierte) liefen mehrere Instanzen gleichzeitig, deren Press/Release-
+Events sich ueber ydotoold ueberschneiden konnten - das kann eine Modifier-
+Taste (Shift/Super) im Kernel als "gedrueckt" haengen lassen, wodurch normales
+Tippen danach falsche/zusaetzliche Zeichen produziert. Der Fallback ist jetzt
+komplett entfernt (die D-Bus-Erweiterung ist auf diesem System laengst aktiv
+und verlässlich - kein Tastenkuerzel-Ersatz mehr noetig) UND ein Lockfile
+verhindert, dass ein zweiter Tastendruck waehrend eines laufenden Durchgangs
+ueberhaupt eine zweite Instanz startet."""
+import fcntl
 import json
 import subprocess
+import sys
 import time
+from pathlib import Path
 
 BASE = "http://192.168.255.222:3002"
 LEFT = (0, 0, 2560, 1440)
@@ -22,6 +32,8 @@ RIGHT_HALF = (2560, 64, 960, 1080)
 BUS = "org.gnome.Shell"
 PATH = "/org/gnome/Shell/Extensions/Windows"
 IFACE = "org.gnome.Shell.Extensions.Windows"
+
+LOCK_PATH = Path("/tmp/mathlern_layout.lock")
 
 
 def dbus_call(method, *args):
@@ -68,30 +80,32 @@ def place_via_dbus():
     dbus_call("MoveResize", win2, *RIGHT_HALF)
 
 
-def place_via_hotkeys_fallback():
-    def key(*codes):
-        subprocess.run(["ydotool", "key", *codes])
-
-    subprocess.Popen(["firefox", "--new-window", f"{BASE}/mission"])
-    time.sleep(3)
-    key("125:1", "42:1", "105:1", "105:0", "42:0", "125:0")  # Super+Shift+Left
-    time.sleep(0.3)
-    key("125:1", "103:1", "103:0", "125:0")  # Super+Up (maximize)
-
-    subprocess.Popen(["firefox", "--new-window", f"{BASE}/admin/schueler"])
-    time.sleep(3)
-    key("125:1", "42:1", "106:1", "106:0", "42:0", "125:0")  # Super+Shift+Right
-    time.sleep(0.3)
-    key("125:1", "105:1", "105:0", "125:0")  # Super+Left (linke Haelfte)
+def _notify_failure(exc: Exception) -> None:
+    msg = f"MathLern-Layout fehlgeschlagen: {exc}"
+    print(msg, file=sys.stderr)
+    try:
+        subprocess.Popen(["notify-send", "MathLern-Layout", msg])
+    except FileNotFoundError:
+        pass  # notify-send optional, Fehler steht schon auf stderr/im Log
 
 
 def main():
+    # Non-blocking Lock: laeuft schon ein Durchgang (z.B. weil die Taste kurz
+    # hintereinander mehrfach gedrueckt wurde), bricht dieser hier sofort ab,
+    # statt eine zweite, ueberlappende Instanz zu starten.
+    lock_file = LOCK_PATH.open("w")
     try:
-        dbus_call("List")  # Verfuegbarkeitscheck
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("MathLern-Layout laeuft schon - zweiter Tastendruck ignoriert.")
+        return
+    try:
         place_via_dbus()
     except Exception as exc:
-        print(f"Window Calls nicht verfuegbar ({exc}), Fallback auf Tastenkuerzel")
-        place_via_hotkeys_fallback()
+        _notify_failure(exc)
+    finally:
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
 
 
 if __name__ == "__main__":
