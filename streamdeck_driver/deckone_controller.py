@@ -354,6 +354,15 @@ class DeckOneController:
             while not self._refresh_stop.wait(SYSTEM_REFRESH_INTERVAL_S):
                 if self.active_profile in ("system", "ki", "home", "radar", "timer", "wo_ist", "wetter_vorhersage") and self.device.connected:
                     try:
+                        if self.active_profile == "wetter_vorhersage":
+                            # Nutzerwunsch 2026-09-08: die Seite soll von
+                            # selbst durch die Vorhersage-Frames laufen ("wie
+                            # die Wolken ziehen sehen"), nicht nur bei
+                            # manuellem Tastendruck (siehe handle_key()) einen
+                            # Frame weiterspringen.
+                            frames = radar._rainviewer_nowcast_frames()
+                            if frames:
+                                self._forecast_idx = (self._forecast_idx + 1) % len(frames)
                         self.render_current_page()
                     except Exception:
                         logger.exception("Fehler beim Auffrischen der Live-Stats")

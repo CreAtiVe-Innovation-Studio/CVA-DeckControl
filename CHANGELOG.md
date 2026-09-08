@@ -2,6 +2,16 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.8.0] - 2026-09-08
+
+### Changed
+- Rain forecast map (`wetter_vorhersage`) now uses a 20km radius instead of
+  the 5km radar resting-view default, so you can see which direction rain
+  is moving in from, not just whether it's already raining at home.
+- The page now automatically cycles through the available forecast frames
+  every 3s (the existing background refresh), instead of only advancing on
+  a manual key press - shows the rain movement as a running loop.
+
 ## [1.7.2] - 2026-09-06
 
 ### Fixed

@@ -79,6 +79,9 @@ EFFECTIVE_W, EFFECTIVE_H = GRID.effective_w, GRID.effective_h  # inkl. der "verd
 TILE_SIZE = 256  # OSM-Kachelgroesse
 
 DEFAULT_RADIUS_KM = 5.0  # Ausgangssicht/Ruhezustand
+FORECAST_RADIUS_KM = 20.0  # Nutzerwunsch 2026-09-08: weiter rausgezoomt als
+# der 5km-Radar-Ruhezustand, damit man auf der Vorhersage-Seite sieht, aus
+# welcher Richtung Regen zieht - nicht nur ob es direkt zuhause regnet.
 APPROACH_MIN_RADIUS_KM = 5.0
 APPROACH_MAX_RADIUS_KM = 40.0
 STORM_BANDS_KM = [(5, 5), (10, 10), (20, 20), (30, 30)]  # (Schwelle, Ziel-Radius)
@@ -775,7 +778,7 @@ def build_forecast_frame(nowcast_index: int = 0) -> RadarFrame:
     garantiert Nowcast-Daten nicht immer/ueberall, dann bleibt es bei der
     Basiskarte + einem 'keine Vorhersage'-Hinweis statt zu crashen."""
     frames = _rainviewer_nowcast_frames()
-    base, zoom, center_px = _fetch_map_for_radius(HOME_LAT, HOME_LON, DEFAULT_RADIUS_KM)
+    base, zoom, center_px = _fetch_map_for_radius(HOME_LAT, HOME_LON, FORECAST_RADIUS_KM)
     img = base.convert("RGB")
 
     if frames:

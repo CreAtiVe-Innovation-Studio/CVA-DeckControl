@@ -326,10 +326,22 @@ Wie das `radar`-Profil (Abschnitt 3) eine Sonderbehandlung in
 `deckone_controller.py::_render_forecast_page()`: EIN grosses Kartenbild
 statt Taste-fuer-Taste aus der YAML, hier aber bewusst NUR Regen-Vorhersage
 (RainViewer-"Nowcast", naechste ~30-60min) ohne Flugzeuge/Blitze/Avatar -
-siehe `radar.py::build_forecast_frame()`. Taste unten rechts = naechster
-Vorhersage-Frame (zyklisch, wie die manuelle Zoom-Taste beim Radar). Kann
-"keine Daten" anzeigen statt einer Karte - RainViewer garantiert Nowcast-
-Daten nicht immer/ueberall, das ist kein Bug.
+siehe `radar.py::build_forecast_frame()`. Radius `radar.py::FORECAST_RADIUS_KM`
+(20km, Nutzerwunsch 2026-09-08 "weiter rausgezoomt") - bewusst weiter draussen
+als der 5km-Radar-Ruhezustand (`DEFAULT_RADIUS_KM`), damit man sieht aus
+welcher Richtung Regen zieht, nicht nur ob es direkt zuhause schon regnet.
+
+Zwei Wege, durch die Vorhersage-Frames zu blaettern: Taste unten rechts =
+manuell einen Frame weiter (zyklisch, wie die manuelle Zoom-Taste beim
+Radar); zusaetzlich schaltet der automatische 3-Sekunden-Hintergrund-
+Refresh (`start_stat_refresh()`) auf dieser Seite von SICH AUS jeden Tick
+einen Frame weiter, solange welche vorhanden sind - ergibt einen von selbst
+laufenden Verlauf ("wie die Wolken ziehen sehen", Nutzerwunsch 2026-09-08),
+ohne dass man dauernd draufdruecken muss.
+
+Kann "keine Daten" anzeigen statt einer Karte - RainViewer garantiert
+Nowcast-Daten nicht immer/ueberall (live verifiziert: `nowcast: []` direkt
+in der RainViewer-Rohantwort), das ist kein Bug im Treiber.
 
 ```yaml
 deckone:
