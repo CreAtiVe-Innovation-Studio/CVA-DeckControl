@@ -2,6 +2,25 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.8.3] - 2026-09-09
+
+### Fixed
+- `tools/mathlern_layout.py`: after v1.8.2's fix, the key still only opened/
+  positioned the first (left) window - the second never appeared. Root
+  cause: the D-Bus wrapper's hand-rolled parsing of `gdbus call`'s
+  pretty-printed GVariant text output was fragile (`Extra data` JSON
+  errors on real calls) and, separately, crashed outright on
+  `MoveResize`/`Close` (void-return methods return empty stdout, which
+  the code fed straight into `json.loads`). Switched to `busctl
+  --json=short` (the same approach already used in
+  `platform_backend/linux.py::get_active_app_id()` for this exact class
+  of problem) and made empty responses return `None` instead of crashing.
+  Verified end-to-end: both windows now open and land at their exact
+  target position.
+- The "MathLern Layout" key also had an unrelated second step attached
+  (a random desktop-theme/wallpaper switch) that made it unclear whether
+  the layout itself was working - split back into its own separate step.
+
 ## [1.8.2] - 2026-09-08
 
 ### Fixed

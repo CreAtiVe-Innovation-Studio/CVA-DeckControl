@@ -36,26 +36,31 @@ IFACE = "org.gnome.Shell.Extensions.Windows"
 LOCK_PATH = Path("/tmp/mathlern_layout.lock")
 
 
-def dbus_call(method, *args):
-    cmd = ["gdbus", "call", "--session", "--dest", BUS, "--object-path", PATH,
-           "--method", f"{IFACE}.{method}"] + [str(a) for a in args]
+def dbus_call(method, signature="", *args):
+    """busctl statt gdbus: gdbus call gibt sein Rueckgabetupel als
+    pretty-gedrucktes GVariant-Textformat aus (z.B. das komplette JSON noch
+    in einfache Anfuehrungszeichen samt Klammern eingebettet), das von Hand
+    zuverlaessig zu parsen ist ueberraschend fehleranfaellig (live gefunden
+    2026-09-09: 'Extra data'-JSONDecodeError, nachdem das urspruengliche
+    manuelle Klammern/Anfuehrungszeichen-Stripping bei echten Auftrufen doch
+    nicht immer griff). busctl --json=short liefert stattdessen sauberes,
+    direkt geparstes JSON - dieselbe Loesung wie in platform_backend/
+    linux.py::get_active_app_id() fuer genau dasselbe Problem."""
+    cmd = ["busctl", "--user", "--json=short", "call", BUS, PATH, IFACE, method]
+    if signature:
+        cmd.append(signature)
+        cmd += [str(a) for a in args]
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
     if out.returncode != 0:
         raise RuntimeError(out.stderr.strip())
-    return out.stdout.strip()
+    # Methoden ohne Rueckgabewert (z.B. MoveResize/Close) liefern LEERES
+    # stdout - json.loads("") wuerde das faelschlich als Fehler werten.
+    return json.loads(out.stdout) if out.stdout.strip() else None
 
 
 def list_windows():
-    raw = dbus_call("List")
-    # gdbus gibt sowas wie ('[{"wm_class": ...}]',) zurueck
-    json_str = raw.strip()
-    if json_str.startswith("("):
-        json_str = json_str[1:]
-    if json_str.endswith(",)"):
-        json_str = json_str[:-2]
-    json_str = json_str.strip().strip("'")
-    json_str = json_str.encode().decode("unicode_escape")
-    return json.loads(json_str)
+    result = dbus_call("List")
+    return json.loads(result["data"][0])
 
 
 def wait_for_new_firefox_window(before_ids, timeout=10):
@@ -72,12 +77,12 @@ def place_via_dbus():
     ids_before = {w["id"] for w in list_windows()}
     subprocess.Popen(["firefox", "--new-window", f"{BASE}/mission"])
     win1 = wait_for_new_firefox_window(ids_before)
-    dbus_call("MoveResize", win1, *LEFT)
+    dbus_call("MoveResize", "uiiuu", win1, *LEFT)
 
     ids_before = {w["id"] for w in list_windows()}
     subprocess.Popen(["firefox", "--new-window", f"{BASE}/admin/schueler"])
     win2 = wait_for_new_firefox_window(ids_before)
-    dbus_call("MoveResize", win2, *RIGHT_HALF)
+    dbus_call("MoveResize", "uiiuu", win2, *RIGHT_HALF)
 
 
 def _notify_failure(exc: Exception) -> None:
