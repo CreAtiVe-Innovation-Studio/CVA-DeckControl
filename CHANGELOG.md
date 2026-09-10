@@ -2,6 +2,21 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.8.4] - 2026-09-10
+
+### Fixed
+- The real, recurring root cause behind the last two `mathlern_layout.py`
+  fixes: as a systemd user service, the driver's own process frequently
+  starts without `DISPLAY` in its environment at all (the desktop session
+  imports it into systemd's user manager on its own schedule, which isn't
+  reliably before this service starts) - so any GUI subprocess it spawns
+  without its own explicit `DISPLAY` (Firefox, gnome-screenshot, custom
+  scripts) can't open a window. `platform_backend/linux.py` now sets
+  `DISPLAY=:0` as a fallback (only if actually missing) as soon as it's
+  imported, fixing this for every GUI-spawning action, not just this one
+  script. Verified live: local X11 connections on this system need no
+  `XAUTHORITY`, so this one fallback is sufficient.
+
 ## [1.8.3] - 2026-09-09
 
 ### Fixed

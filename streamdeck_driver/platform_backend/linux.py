@@ -16,6 +16,22 @@ from .. import vkeycode_map
 
 logger = logging.getLogger("streamdeck_driver.platform_backend.linux")
 
+# BUG GEFUNDEN 2026-09-09/10 (live gemeldet, zweimal): als systemd-User-Dienst
+# gestartete Prozesse bekommen DISPLAY/XAUTHORITY oft NICHT verlaesslich in
+# ihre Umgebung importiert - haengt von der Reihenfolge ab, in der die
+# Desktop-Sitzung diese Variablen in den systemd-User-Manager importiert
+# (dbus-update-activation-environment/systemctl --user import-environment),
+# relativ dazu wann dieser Dienst startet. `PartOf=graphical-session.target`
+# in der .service-Datei loest das NICHT zuverlaessig (nur Stop-Propagation,
+# kein garantiertes Nachimportieren). Jeder ueber subprocess.Popen() ohne
+# eigenes env= gestartete GUI-Kindprozess (Firefox, gnome-screenshot, eigene
+# Skripte wie tools/mathlern_layout.py) erbt fehlendes DISPLAY und kann dann
+# gar kein X11-Fenster oeffnen. Live verifiziert: lokale X11-Verbindungen
+# brauchen auf diesem System KEIN XAUTHORITY (nur DISPLAY=:0), daher reicht
+# dieser eine Fallback. os.environ.setdefault() greift nur, wenn DISPLAY
+# WIRKLICH fehlt - eine echte Wayland-Session wird dadurch nicht verfaelscht.
+os.environ.setdefault("DISPLAY", ":0")
+
 
 def send_hotkey(vkeycode: int, ctrl: bool, shift: bool, alt: bool) -> None:
     codes = vkeycode_map.resolve(vkeycode, ctrl, shift, alt)
