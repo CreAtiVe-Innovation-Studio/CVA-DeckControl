@@ -185,6 +185,23 @@ Option eine Taste mit demselben Skript-Pfad, aber jeweils anderem Argument
 in `linux_command`. Beispiel (Farbschema-Umschalter mit 3 Optionen) siehe
 `profiles.example.yaml` unter `deckone.profiles.farbschema`.
 
+**Bekannte Einschraenkung: `hotkey` mit Standard-Medientasten (Play/Pause/
+Stop/Weiter/Zurueck) erreicht NICHT jeden Player.** Diese Tasten (Linux-
+Codes KEY_PLAYPAUSE/KEY_STOPCD/KEY_NEXTSONG/KEY_PREVIOUSSONG) landen dort,
+wohin die Desktop-Umgebung sie global routet - meistens per MPRIS
+(`org.mpris.MediaPlayer2`) an den laufenden Player. Player, die MPRIS NICHT
+unterstuetzen (z.B. `mpv` ohne Zusatz-Skript, live gefunden 2026-09-13:
+"kann bei mpv nicht stoppen/vorspulen/zurueck/shuffle"), bekommen davon
+nichts mit - die Taste hat schlicht kein Ziel. Fuer mpv siehe
+`tools/mpv_media_key.py`: steuert zuerst ueber mpvs eigenen JSON-IPC-Socket
+(`input-ipc-server=/tmp/mpvsocket` in `~/.config/mpv/mpv.conf`, wirkt erst
+nach einem mpv-Neustart), das funktioniert unabhaengig von Fensterfokus und
+MPRIS; nur wenn der Socket nicht erreichbar ist, faellt es auf die normale
+Medientaste zurueck (fuer MPRIS-faehige Player wie Spotify). Dasselbe
+Kochrezept (eigenes Steuer-Skript statt blindem Tastendruck) laesst sich auf
+jeden anderen Player mit einer eigenen Fernsteuerungs-Schnittstelle
+uebertragen.
+
 ### 4.3 `open_sequence` - mehrere Programme nacheinander
 
 ```yaml

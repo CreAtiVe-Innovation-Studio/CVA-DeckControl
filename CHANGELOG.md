@@ -2,6 +2,20 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.0] - 2026-09-13
+
+### Added
+- `tools/mpv_media_key.py`: user-reported issue - the audio page's standard
+  media-key hotkeys (Play/Pause/Stop/Next/Previous/Shuffle) never reach
+  `mpv`, because they rely on the desktop environment routing them via
+  MPRIS to the active player, and `mpv` doesn't implement MPRIS without an
+  extra script. This new helper controls mpv directly through its own JSON
+  IPC socket (`input-ipc-server` in `mpv.conf`) instead, which works
+  regardless of window focus or MPRIS support; falls back to the normal
+  media-key press only if that socket isn't reachable (for MPRIS-capable
+  players like Spotify). Verified live against a real mpv instance: all
+  five actions land correctly over the socket.
+
 ## [1.8.4] - 2026-09-10
 
 ### Fixed
