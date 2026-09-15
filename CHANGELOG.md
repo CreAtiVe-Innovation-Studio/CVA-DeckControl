@@ -2,6 +2,17 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.1] - 2026-09-15
+
+### Changed
+- `tools/open_youtube.sh`: opens YouTube in a Firefox window instead of a
+  Chromium app window, on user request (already logged in everywhere in
+  Firefox). Several web-app keys in the user's own config were switched
+  from Chromium `--app=` windows to the `website` action type for the same
+  reason - the system default browser is already Firefox, so `website`
+  (via `xdg-open`) opens them there directly, no separate fix needed for
+  that action type itself.
+
 ## [1.9.0] - 2026-09-13
 
 ### Added

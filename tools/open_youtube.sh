@@ -1,5 +1,6 @@
 #!/bin/bash
 # YouTube-Taste: Lautstaerke erst auf 5% (YouTube startet gerne unerwartet
-# laut), dann eigenes App-Fenster oeffnen.
+# laut), dann in einem neuen Firefox-Fenster oeffnen (Nutzerwunsch 2026-09-15:
+# Firefox statt Chromium, da dort ueberall angemeldet).
 wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%
-/snap/bin/chromium --app=https://www.youtube.com
+firefox --new-window https://www.youtube.com
