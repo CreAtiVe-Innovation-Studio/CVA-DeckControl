@@ -2,6 +2,21 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.2] - 2026-09-17
+
+### Fixed
+- `website` actions (`xdg-open`) could open the wrong browser (live reported:
+  "Teams still opens Chromium" despite the config already correctly
+  pointing at the `website` action type and Firefox being the system
+  default). Same root cause as the earlier `DISPLAY` fix: as a systemd user
+  service, the driver's process is missing `XDG_CURRENT_DESKTOP` in its
+  environment, and without it `xdg-open`/`xdg-mime` resolve the default
+  browser incorrectly - reproduced live and isolated to this one variable
+  among all the differing `XDG_*` values. `platform_backend/linux.py` now
+  sets a fallback for this too. Affects every `website` action, not just
+  this one key - verified end-to-end with the daemon's exact (stripped)
+  environment simulated.
+
 ## [1.9.1] - 2026-09-15
 
 ### Changed

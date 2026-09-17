@@ -32,6 +32,18 @@ logger = logging.getLogger("streamdeck_driver.platform_backend.linux")
 # WIRKLICH fehlt - eine echte Wayland-Session wird dadurch nicht verfaelscht.
 os.environ.setdefault("DISPLAY", ":0")
 
+# BUG GEFUNDEN 2026-09-17 (live gemeldet: "Teams oeffnet immer noch Chromium"
+# trotz korrekter profiles.yaml/mimeapps.list): derselbe fehlende-Umgebung-
+# Mechanismus wie oben bei DISPLAY, hier fuer XDG_CURRENT_DESKTOP - fehlt das,
+# waehlt xdg-open/xdg-mime den falschen Standard-Browser (live reproduziert:
+# mit exakt der Umgebung des laufenden Dienst-Prozesses, aber zusaetzlich
+# XDG_CURRENT_DESKTOP gesetzt, kippt 'xdg-mime query default
+# x-scheme-handler/https' von chromium_chromium.desktop auf
+# firefox_firefox.desktop - einzeln unter allen abweichenden XDG_*-Variablen
+# als die entscheidende identifiziert). Betrifft jede Aktion, die xdg-open
+# fuer eine Website nutzt (Action-Typ 'website'), nicht nur diese eine Taste.
+os.environ.setdefault("XDG_CURRENT_DESKTOP", "ubuntu:GNOME")
+
 
 def send_hotkey(vkeycode: int, ctrl: bool, shift: bool, alt: bool) -> None:
     codes = vkeycode_map.resolve(vkeycode, ctrl, shift, alt)
