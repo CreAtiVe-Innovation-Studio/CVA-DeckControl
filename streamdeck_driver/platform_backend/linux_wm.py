@@ -3,8 +3,9 @@
 Weg wie get_active_app_id() in linux.py und tools/mathlern_layout.py. Unter Wayland
 gibt es keinen erweiterungsfreien Weg, fremde Fenster zu verschieben.
 
-UNGETESTET auf diesem Weg durch den Autor (entwickelt auf Windows); die D-Bus-Aufrufe
-entsprechen dem bereits produktiv genutzten tools/mathlern_layout.py. Bekannte
+Entwickelt auf Windows, auf Linux (GNOME/X11, zwei Monitore, Window Calls) live
+getestet: Liste, Platzieren, Fokus aus minimiert, Maximieren/Zurueck, Anordnen.
+Hinweis: 'List' liefert keine Geometrie, die kommt per GetFrameRect/Details. Bekannte
 Naeherungen:
 * Arbeitsflaeche: GNOME meldet keine Panel-Hoehe ueber diesen Weg - es wird die
   volle Monitorflaeche genutzt. Unterkante/Oberkante des Panels ggf. ueber den
@@ -29,7 +30,7 @@ def _call(method: str, signature: str = "", *args):
     cmd = ["busctl", "--user", "--json=short", "call", BUS, PATH, IFACE, method]
     if signature:
         cmd += [signature, *[str(a) for a in args]]
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
     if out.returncode != 0:
         raise RuntimeError(out.stderr.strip())
     return json.loads(out.stdout) if out.stdout.strip() else None
@@ -54,6 +55,7 @@ def parse_window_list(raw_json: str) -> list[dict]:
             "w": int(w.get("width", 0)), "h": int(w.get("height", 0)),
             "minimized": bool(w.get("minimized", False)), "maximized": bool(w.get("maximized", False)),
             "focused": bool(w.get("focus", False)),
+            "window_type": int(w.get("window_type", 0)),
         })
     return windows
 
@@ -65,13 +67,33 @@ def list_windows() -> list[dict]:
     except (RuntimeError, OSError, subprocess.SubprocessError, ValueError, KeyError) as exc:
         logger.warning("Fensterliste nicht lesbar - GNOME-Erweiterung 'Window Calls' fehlt/inaktiv? (%s)", exc)
         return []
+    # Window Calls 'List' liefert (je nach Version) weder Geometrie noch
+    # Zustand - live geprueft: nur id/title/wm_class/focus/window_type. Geometrie
+    # kommt per GetFrameRect, minimiert/maximiert per Details. Nur normale
+    # Fenster (window_type 0), keine Desktop-Icons/Panels.
+    result = []
     for w in windows:
+        if w["window_type"] != 0:
+            continue
+        try:
+            rect = json.loads(_string_result(_call("GetFrameRect", "u", w["id"])))
+            w.update(x=int(rect["x"]), y=int(rect["y"]), w=int(rect["width"]), h=int(rect["height"]))
+        except (RuntimeError, OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+            pass
+        try:
+            details = json.loads(_string_result(_call("Details", "u", w["id"])))
+            w["minimized"] = bool(details.get("minimized", w["minimized"]))
+            w["maximized"] = int(details.get("maximized", 0)) >= 3 or bool(details.get("fullscreen", False))
+        except (RuntimeError, OSError, subprocess.SubprocessError, ValueError, TypeError):
+            pass
         if not w["title"]:
             try:
                 w["title"] = _string_result(_call("GetTitle", "u", w["id"]))
             except (RuntimeError, OSError, subprocess.SubprocessError, ValueError):
                 pass
-    return [w for w in windows if w["w"] > 0 and w["h"] > 0]
+        if w["w"] > 0 and w["h"] > 0:
+            result.append(w)
+    return result
 
 
 _XRANDR_RE = re.compile(r"^\s*\d+:\s+\+(?P<star>\*?)\S+\s+(?P<w>\d+)/\d+x(?P<h>\d+)/\d+\+(?P<x>-?\d+)\+(?P<y>-?\d+)")

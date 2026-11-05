@@ -26,7 +26,7 @@ Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
   `move_window`, `focus_window`, `maximize_window`, `restore_window`,
   `minimize_window`, `start_minimized`. Windows: Win32 via ctypes (per-monitor
   DPI aware, compensates the invisible window border, works around the
-  foreground lock). Linux: GNOME "Window Calls" D-Bus (untested). macOS:
+  foreground lock). Linux: GNOME "Window Calls" D-Bus (verified on GNOME/X11, two monitors). macOS:
   no-op placeholder.
 
 ### Fixed

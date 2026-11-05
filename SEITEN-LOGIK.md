@@ -534,7 +534,7 @@ nachgeprueft und ggf. erneut verschoben.
 **Plattformen**: Windows (Win32 per ctypes, getestet auf Windows 11 mit zwei
 Monitoren gemischter Skalierung: Position pixelgenau, Vordergrund-Sperre
 umgangen). Linux ueber die GNOME-Erweiterung "Window Calls" (siehe 4.13),
-**ungetestet**; Monitore per `xrandr --listmonitors`, ohne Panel-Abzug.
+getestet auf GNOME/X11 mit zwei Monitoren (Liste, Platzieren, Fokus, Maximieren, Anordnen); Monitore per `xrandr --listmonitors`, ohne Panel-Abzug.
 macOS: keine Wirkung (harmloser Platzhalter).
 
 ---
