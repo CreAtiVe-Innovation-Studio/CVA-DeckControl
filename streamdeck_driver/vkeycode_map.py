@@ -69,6 +69,15 @@ VK_TO_LINUX: dict[int, KeyMapping] = {
     131: KeyMapping("F20", 190, False),
     132: KeyMapping("F21", 191, False),
     133: KeyMapping("F22", 192, False),
+    # F13-F24 vollstaendig (VK 0x7C-0x87 = 124-135 -> KEY_F13..KEY_F24 = 183-194):
+    # Web-Apps (MathLern) werden per layout_hotkey ueber F13-F24 ferngesteuert.
+    124: KeyMapping("F13", 183, True),
+    126: KeyMapping("F15", 185, True),
+    128: KeyMapping("F17", 187, True),
+    129: KeyMapping("F18", 188, True),
+    130: KeyMapping("F19", 189, True),
+    134: KeyMapping("F23", 193, True),
+    135: KeyMapping("F24", 194, True),
     155: KeyMapping("F24_approx", 194, False),  # unsicher, evtl. andere Taste
     222: KeyMapping("Apostrophe", 40, False),  # KEY_APOSTROPHE
     61: KeyMapping("Unknown_0x3D", -1, False),  # kein Standard-VK, keine Zuordnung
@@ -92,3 +101,18 @@ def resolve(vkeycode: int, ctrl: bool, shift: bool, alt: bool, meta: bool = Fals
         codes.append(KEY_LEFTMETA)
     codes.append(mapping.linux_keycode)
     return codes
+
+
+# evdev-Keycode -> X11-Keysym-Name, fuer xdotool (X11-Sitzungen). Das auf manchen
+# Systemen installierte ydotool (0.1.x, Ubuntu-Paket) kennt nur Tastennamen statt
+# 'code:1'-Sequenzen und hat keine F13-F24 - dort tippte der Zahlencode-Weg
+# stattdessen die Ziffer "1" (live beobachtet). xdotool kennt alles hier.
+XKEYSYM_BY_LINUX_CODE: dict[int, str] = {
+    KEY_LEFTCTRL: "ctrl", KEY_LEFTSHIFT: "shift", KEY_LEFTALT: "alt", KEY_LEFTMETA: "super",
+    113: "XF86AudioMute", 114: "XF86AudioLowerVolume", 115: "XF86AudioRaiseVolume",
+    163: "XF86AudioNext", 165: "XF86AudioPrev", 166: "XF86AudioStop", 164: "XF86AudioPlay",
+    99: "Print", 31: "s", 21: "y", 44: "z", 105: "Left", 106: "Right", 108: "Down",
+    104: "Prior", 109: "Next", 126: "Super_R", 82: "KP_0", 55: "KP_Multiply",
+    83: "KP_Decimal", 98: "KP_Divide", 40: "apostrophe",
+    **{183 + i: f"F{13 + i}" for i in range(12)},
+}

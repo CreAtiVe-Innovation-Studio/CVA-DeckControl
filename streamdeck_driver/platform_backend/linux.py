@@ -50,6 +50,16 @@ def send_hotkey(vkeycode: int, ctrl: bool, shift: bool, alt: bool) -> None:
     if not codes:
         logger.warning("Hotkey vkeycode=%s: keine bekannte Linux-Zuordnung, ignoriert", vkeycode)
         return
+    # X11: xdotool (kennt F13-F24 und Tastennamen). ydotool 0.1.x versteht die
+    # 'code:1'-Sequenzen unten nicht (siehe vkeycode_map.XKEYSYM_BY_LINUX_CODE).
+    names = [vkeycode_map.XKEYSYM_BY_LINUX_CODE.get(c) for c in codes]
+    if not _is_wayland_session() and shutil.which("xdotool") and all(names):
+        try:
+            subprocess.run(["xdotool", "key", "+".join(names)], check=True, timeout=5)
+            logger.info("Hotkey ausgefuehrt (xdotool): vkeycode=%s -> %s", vkeycode, "+".join(names))
+            return
+        except (subprocess.SubprocessError, FileNotFoundError) as exc:
+            logger.warning("xdotool-Hotkey fehlgeschlagen (vkeycode=%s), versuche ydotool: %s", vkeycode, exc)
     seq = [f"{c}:1" for c in codes] + [f"{codes[-1]}:0"] + [f"{c}:0" for c in reversed(codes[:-1])]
     try:
         subprocess.run(["ydotool", "key", *seq], check=True, timeout=5)

@@ -60,3 +60,21 @@ def test_list_windows_reads_geometry_and_state_per_window(monkeypatch):
     w = wins[0]
     assert (w["id"], w["app_id"], w["x"], w["y"], w["w"], w["h"]) == ("2", "firefox", 5, 6, 700, 400)
     assert w["minimized"] is True and w["maximized"] is True and w["focused"] is True
+
+
+def test_f13_to_f24_resolve_and_have_xdotool_names():
+    """layout_hotkey fernsteuert Web-Apps per F13-F24 (VK 124-135)."""
+    from streamdeck_driver import vkeycode_map
+    for i, vk in enumerate(range(124, 136)):
+        assert vkeycode_map.resolve(vk, False, False, False) == [183 + i]
+        assert vkeycode_map.XKEYSYM_BY_LINUX_CODE[183 + i] == f"F{13 + i}"
+
+
+def test_send_hotkey_uses_xdotool_on_x11(monkeypatch):
+    from streamdeck_driver.platform_backend import linux
+    calls = []
+    monkeypatch.setattr(linux, "_is_wayland_session", lambda: False)
+    monkeypatch.setattr(linux.shutil, "which", lambda n: "/usr/bin/xdotool")
+    monkeypatch.setattr(linux.subprocess, "run", lambda cmd, **kw: calls.append(cmd))
+    linux.send_hotkey(124, True, False, False)  # Ctrl+F13
+    assert calls == [["xdotool", "key", "ctrl+F13"]]

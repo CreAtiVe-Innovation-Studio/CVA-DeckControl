@@ -43,6 +43,10 @@ Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 - Timer page: switching the live view on opens it in the browser; the
   settings key waits for the GUI port before opening it. `website` actions can
   open a separate window (`new_window: true`).
+- Linux hotkeys: on X11 `send_hotkey` now uses `xdotool` (key names). The
+  numeric `ydotool key code:1` sequences typed the digit "1" with the
+  name-based ydotool 0.1.x that Ubuntu ships; F13-F24 (VK 124-135, used by
+  `layout_hotkey`) were missing from the key map entirely.
 
 ## [1.9.2] - 2026-09-17
 
