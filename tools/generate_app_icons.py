@@ -7,6 +7,7 @@ Ergebnis landet in assets/generated-icons/<slug>.png
 """
 from __future__ import annotations
 
+import argparse
 import json
 import time
 import uuid
@@ -114,6 +115,61 @@ ICONS = {
     "streaming_technik": "a glowing gear and wrench crossed together, technical settings symbol",
     "streaming_hai": "a simple shark fin icon cutting through a wave line",
     "streaming_eispalast": "a crystalline ice castle icon with pointed towers",
+    "zoom": "a bold glowing neon blue video camera outline, rectangle body with a triangle lens, video call symbol, pure black background",
+    "obs": "a glowing circular broadcast record symbol, a ring with a solid dot in the middle and small signal arcs, live streaming software",
+    "fotos": "a glowing framed landscape photo with a sun and two mountain peaks inside a rounded rectangle, photo gallery symbol",
+    "pdf": "a glowing red document page with a folded corner and a bold arrow-down document mark, PDF file symbol, no letters",
+    "window_arrange": "four glowing rectangles of different sizes arranged as a tidy tiled grid, arrange windows symbol",
+    "window_maximize": "four bold glowing neon arrows pointing diagonally outward to the four corners, fullscreen expand symbol, pure black background",
+    "timer": "a glowing stopwatch icon with a small button on top and one hand",
+    "settings_gear": "a bold glowing cogwheel gear icon, settings symbol",
+    "live_view": "a glowing eye inside a rounded rectangle monitor frame with a small pulse line, live view symbol",
+    # --- MathLern-Fernsteuerung (Tabs, Aktionen, Whiteboard-Editor) ---
+    "ml_uebersicht": "a dashboard overview made of four rounded rectangle outlines of different sizes, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_aufgabe": "a glowing eye above a task sheet outline with an empty checkbox, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_verlauf": "a history list outline with a circular counter-clockwise clock arrow, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_themen": "a glowing rising line chart with three small topic bubbles",
+    "ml_schwaechen": "a glowing target board with an arrow stuck at the outer ring, weakness symbol, neon outline only, pure black background",
+    "ml_hausaufgaben": "a glowing notebook with a pencil and a checklist",
+    "ml_klausuren": "an exam paper outline with a small calendar grid and a pencil, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_noten": "a report card outline with a bold number 1 and a small bar chart, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_abi": "a glowing graduation cap with a tassel",
+    "ml_quiz": "a glowing puzzle piece with a question mark inside, neon outline only, pure black background",
+    "ml_quizergebnisse": "a glowing puzzle piece next to a small bar chart",
+    "ml_kontingent": "a glowing hourglass with a battery level bar",
+    "ml_missionen": "a glowing flag planted on a mountain peak, mission goal symbol",
+    "ml_praesentation": "a projector screen outline on a stand showing a small bar chart, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_bewertungen": "a glowing row of five rating stars, three filled",
+    "ml_kitipps": "a glowing lightbulb with a magnifying glass and small sparkles",
+    "ml_stunden": "a glowing clock face next to a list of lines, lesson log symbol",
+    "ml_wb_schueler": "a glowing monitor screen with an eye icon, show to student symbol",
+    "ml_wb_scharf": "a glowing power toggle switch in the on position with a small lightning bolt",
+    "ml_wb_a4": "a portrait A4 sheet of paper outline with a folded corner and a dashed page border, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_wb_pdf_a4": "a glowing stack of A4 pages with a bold arrow pointing down, neon outline only, pure black background",
+    "ml_wb_pdf_1": "a glowing single document page with a bold arrow pointing down",
+    "ml_ha_generieren": "a homework sheet outline with sparkles above it, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_ha_ki": "a glowing friendly robot head holding a pencil above a notebook",
+    "ml_ha_referenz": "a magnifying glass over a document page outline, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_ha_bewerten": "a glowing red pencil with a checkmark and a grade number",
+    "ml_quiz_generieren": "a glowing question mark surrounded by sparkles",
+    "ml_quiz_referenz": "a glowing folder with a question mark document peeking out",
+    "ml_trainer_ha": "a glowing dumbbell with a small brain, training homework symbol",
+    "ml_merkzettel": "a sticky note outline with a push pin and a few text lines, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_mission_ki": "a glowing friendly robot head holding a small flag",
+    "ml_mission_gen": "a glowing rocket with sparkles, generate mission symbol",
+    "ml_mission_thema": "a glowing stack of three books",
+    "ml_mission_referenz": "a glowing clipboard with a document and a reference stamp",
+    "ml_mission_bild": "a glowing camera with a picture frame, image source symbol",
+    "ml_praes_start": "a glowing play triangle on a projector screen",
+    "ml_praes_ende": "a bold square stop symbol inside a projector screen outline, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
+    "ml_ki_auswerten": "a glowing brain with a magnifying glass, analysis symbol",
+    "ml_stadt_vorab": "a glowing city skyline with sparkles, pre-generate city symbol",
+    "ml_stift": "a glowing marker pen drawing a short line",
+    "ml_radierer": "a glowing eraser block rubbing out a line",
+    "ml_auswahl": "a glowing mouse cursor arrow with a dotted selection rectangle",
+    "ml_hand": "a glowing open hand palm, pan tool symbol",
+    "ml_loesungsstift": "a glowing pen with a small padlock, solution pen symbol",
+    "ml_marker": "a checkmark flag on a pole standing upright, unlock marker symbol, thin glowing neon outline line-art only, no solid white fill, no filled tiles, pure black background",
 }
 
 
@@ -177,8 +233,20 @@ def generate_one(slug: str, prompt: str) -> Path | None:
 
 
 def main() -> None:
+    global OUT_DIR
+    parser = argparse.ArgumentParser(description="Icons per ComfyUI generieren")
+    parser.add_argument("slugs", nargs="*", help="nur diese Icons erzeugen (Standard: alle)")
+    parser.add_argument("--out", type=Path, help="Zielordner (Standard: assets/generated-icons)")
+    args = parser.parse_args()
+    if args.out:
+        OUT_DIR = args.out
+    unknown = [s for s in args.slugs if s not in ICONS]
+    if unknown:
+        raise SystemExit(f"Unbekannte Icons: {', '.join(unknown)}")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for slug, prompt in ICONS.items():
+        if args.slugs and slug not in args.slugs:
+            continue
         try:
             generate_one(slug, prompt)
         except Exception as exc:

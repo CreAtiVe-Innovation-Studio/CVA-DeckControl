@@ -5,7 +5,12 @@ Web-Mercator/zoom math in `radar.py` and `location_map.py`, the timer state
 machine, the short/long key-press distinction in `deckone_controller.py`,
 the HA-unreachable error badge (`ha_client.is_healthy()` + the tile
 rendering it feeds), the automatic profile-switch matching/edge-triggering
-in `window_watch.py`, and the version-comparison logic in `update_check.py`.
+in `window_watch.py`, the version-comparison logic in `update_check.py`, and
+the window-layout feature (`windowing/`: slot geometry, matching, start
+sequence, focus/maximize/page logic, auto-placement - all against a fake
+backend, plus the pure parsing of `platform_backend/linux_wm.py`). The real
+Win32 calls in `platform_backend/windows_wm.py` were verified by hand against
+a live Windows 11 desktop (two monitors, mixed scaling), not automated.
 
 Deliberately **not** covered: anything that needs real hardware (USB/HID
 devices), a real Home Assistant instance, a live network call

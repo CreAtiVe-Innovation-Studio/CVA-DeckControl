@@ -9,7 +9,7 @@ import logging
 
 from gui import server as gui_server
 
-from . import ha_client, platform_backend
+from . import ha_client, platform_backend, windowing
 
 logger = logging.getLogger("streamdeck_driver.actions")
 
@@ -99,6 +99,8 @@ def dispatch(action: dict, key_label: str) -> None:
         run_ha_cover(action)
     elif action_type == "open_gui":
         run_open_gui(action)
+    elif action_type in windowing.ACTION_TYPES:
+        windowing.run_action(action)
     elif action_type == "unmapped":
         logger.warning("Unmapped-Aktion (%s): %s - ignoriert", key_label, action.get("note"))
     else:

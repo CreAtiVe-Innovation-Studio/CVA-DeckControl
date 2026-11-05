@@ -451,6 +451,94 @@ Inhalte wie Suchbegriffe oder Chat-Vorschauen enthalten.
 
 ---
 
+### 4.14 `window_layouts` - Fenster-Layouts ("Unterricht"-Modus)
+
+Ein Layout beschreibt, welche Apps wo auf welchem Monitor liegen. Eine
+**Start-Taste** oeffnet fehlende Apps und stellt jedes Fenster exakt auf seine
+Position; weitere Tasten holen eine App in den Vordergrund, blaettern im
+Vordergrundfenster oder maximieren es. Wie `auto_profile_switch` ein eigener
+TOP-LEVEL-Schluessel in `profiles.yaml` - ohne ihn ist das Feature komplett
+inaktiv.
+
+```yaml
+window_layouts:
+  unterricht:                      # frei waehlbarer Layout-Name
+    start_timeout_s: 30            # solange wartet der Start auf neue Fenster
+    services:                      # Hintergrunddienste, nur gestartet wenn der Port noch zu ist
+      - name: llama-swap
+        port: 8080
+        command: {windows: 'C:\tools\start-llama-swap.bat', linux: '/opt/llama/start.sh'}
+        cwd: ...                   # optional
+    apps:
+      mission:                     # frei waehlbarer App-Name (wird von 'layout_focus' referenziert)
+        match:
+          process: [firefox]       # Prozessname (Windows, ohne .exe) bzw. wm_class (Linux), Teilstring, klein
+          order: 0                 # optional: bei mehreren Fenstern der App der Index von links nach rechts
+          title: 'regex'           # optional: Fenstertitel muss passen
+          title_exclude: 'regex'   # optional
+        slot: {monitor: left, x: 0, y: 0, w: 1, h: 1}
+        launch: 'C:\Program Files\Mozilla Firefox\firefox.exe'     # Startbefehl, oder je OS {windows:, linux:}
+        launch_uri: 'ms-teams:'    # Alternative zu 'launch': URI/Datei ueber die System-Zuordnung oeffnen
+        launch_with: mission       # teilt sich den Start mit einer anderen App (z.B. 2. Firefox-Fenster)
+        start: true                # vom Start-Knopf geoeffnet/positioniert
+        auto_place: false          # true: positioniert, sobald der Nutzer die App selbst oeffnet
+        page_keys: {prev: 37, next: 39}   # VKeyCodes fuer 'layout_page' (Standard Pfeil links/rechts)
+```
+
+**`slot`**: `monitor` ist `left`/`right` (Reihenfolge von links nach rechts),
+`primary`/`secondary` oder eine Zahl (Index von links). `x/y/w/h` sind ANTEILE
+(0..1) der **Arbeitsflaeche** des Monitors (ohne Taskleiste/Panel) - so passt
+dasselbe Layout auf andere Aufloesungen/Skalierungen. Fehlt der zweite
+Monitor, landet alles auf dem primaeren, statt ausserhalb des Bildschirms.
+
+**Mehrere Fenster derselben App** (z.B. zwei Firefox-Fenster mit je eigenen
+Tabs): `match.order` waehlt nach Position von links nach rechts. Fenstertitel
+werden dafuer bewusst nicht gebraucht (sie enthalten oft Privates). Firefox
+oeffnet beim Start seine Fenster samt Tabs selbst per Sitzungs-Wiederherstellung;
+die zweite App traegt dafuer `launch_with: <erste App>`, damit nur EINMAL
+gestartet wird.
+
+**Aktionstypen** (alle auf beiden Geraeten verwendbar):
+
+| `type` | Parameter | Wirkung |
+|---|---|---|
+| `layout_start` | `layout` | Dienste starten (falls Port zu), fehlende `start`-Apps oeffnen, alle positionieren, danach `auto_place` aktivieren |
+| `layout_arrange` | `layout` | nur bereits offene Fenster auf ihre Slots zuruecksetzen, nichts starten |
+| `layout_focus` | `app`, `layout` | App in den Vordergrund (auch aus minimiert); fehlt sie: starten, positionieren, fokussieren |
+| `layout_page` | `direction: prev\|next`, `layout` | sendet die `page_keys` der Vordergrund-App (PDF-Seite, naechstes Foto) |
+| `layout_maximize` | `layout` | Vordergrundfenster maximieren (bis zur Taskleiste) bzw. zurueck in Slot/alte Position |
+| `layout_hotkey` | `app`, `layout`, `vkeycode`, `ctrl`, `shift`, `alt` | Fenster der App in den Vordergrund (nur wenn es schon offen ist, nichts wird gestartet), kurz warten, dann Tastenkombination senden. Fuer Web-Apps, die per Kuerzel (z.B. F13-F24) ferngesteuert werden, siehe `mathlern-fernsteuerung-kuerzel.md` |
+| `layout_stop` | - | `auto_place` ausschalten |
+
+`layout` darf entfallen, solange es nur ein Layout gibt.
+
+**Position aufnehmen statt von Hand rechnen**: alles einmal so hinschieben wie
+gewuenscht, dann `python tools/capture_layout.py --name unterricht` - gibt einen
+fertigen `window_layouts`-Block aus (Slots, `order`, Startbefehl-Vorschlag;
+bewusst ohne Fenstertitel). Danach `start`/`auto_place` je App setzen.
+
+**Fenster-Bindung**: Titel/`order` dienen nur zum ERSTEN Finden eines Fensters.
+Beim Platzieren merkt sich der Treiber dessen Fenster-ID je App; alle Tasten
+(Fokus, Anordnen, ...) nutzen danach diese ID, solange das Fenster existiert -
+wichtig, weil sich der Titel mit jedem Tab-Wechsel aendert. **Nie doppelt
+starten**: laeuft der Prozess einer App schon (egal mit welchem Fenster), wird
+sie weder vom Start noch von `layout_focus` erneut gestartet (ein zweiter
+Firefox-Start oeffnet z.B. nur ein leeres Zusatzfenster).
+
+**`auto_place`** (nur nach `layout_start`, bis `layout_stop`/Neustart): Fenster,
+die NACH dem Start neu erscheinen und zu einer `auto_place`-App passen, werden
+auf ihren Slot gesetzt; bereits offene bleiben unberuehrt. Viele Apps setzen
+ihre Groesse kurz nach dem Erscheinen selbst nochmal - deshalb wird nach 1,2 s
+nachgeprueft und ggf. erneut verschoben.
+
+**Plattformen**: Windows (Win32 per ctypes, getestet auf Windows 11 mit zwei
+Monitoren gemischter Skalierung: Position pixelgenau, Vordergrund-Sperre
+umgangen). Linux ueber die GNOME-Erweiterung "Window Calls" (siehe 4.13),
+**ungetestet**; Monitore per `xrandr --listmonitors`, ohne Panel-Abzug.
+macOS: keine Wirkung (harmloser Platzhalter).
+
+---
+
 ## 5. Icons (`icon:`-Feld pro Taste)
 
 Drei Typen, verarbeitet von [`icon_render.py::render_key_icon()`](streamdeck_driver/icon_render.py)

@@ -16,6 +16,42 @@ auto_profile_switch:
   apps:
     obs: streaming
     firefox: buero
+# Fenster-Layout - komplett optional, siehe SEITEN-LOGIK.md Abschnitt 4.14.
+# Positionen sind Anteile (0..1) der Arbeitsflaeche des jeweiligen Monitors.
+# Am einfachsten aufnehmen: Fenster hinschieben, dann
+#   python tools/capture_layout.py --name unterricht
+# Passt die Prozessnamen (match.process) und Startbefehle an das eigene System an.
+window_layouts:
+  unterricht:
+    start_timeout_s: 30
+    services:                       # nur gestartet, wenn der Port noch nicht belegt ist
+      - name: lokaler-server
+        port: 8080
+        command: {windows: 'C:\tools\start-server.bat', linux: '/opt/server/start.sh'}
+    apps:
+      browser_links:                # 1. Firefox-Fenster (von links nach rechts), ganzer linker Monitor
+        match: {process: [firefox], order: 0}
+        slot: {monitor: left, x: 0, y: 0, w: 1, h: 1}
+        launch: {windows: 'C:\Program Files\Mozilla Firefox\firefox.exe', linux: firefox}
+        start: true
+      browser_rechts:               # 2. Firefox-Fenster, rechte Haelfte des rechten Monitors
+        match: {process: [firefox], order: 1}
+        slot: {monitor: right, x: 0.5, y: 0, w: 0.5, h: 1}
+        launch_with: browser_links  # Firefox stellt beide Fenster selbst wieder her
+        start: true
+      chat:
+        match: {process: [teams, ms-teams]}
+        slot: {monitor: right, x: 0, y: 0, w: 0.22, h: 1}
+        launch_uri: 'msteams:'
+        start: true
+      bilder:                       # nicht vom Start geoeffnet, aber positioniert, wenn man es selbst oeffnet
+        match: {process: [photos, eog]}
+        slot: {monitor: right, x: 0.42, y: 0, w: 0.58, h: 0.82}
+        auto_place: true
+      pdf:
+        match: {process: [msedge, evince], title: '\.pdf'}
+        slot: {monitor: right, x: 0.45, y: 0, w: 0.55, h: 0.85}
+        auto_place: true
 version: 1
 elgato:
   pages:
@@ -200,3 +236,59 @@ deckone:
               linux_command: /home/DEINNAME/skripte/farbschema-setzen kontrast
             icon:
               type: generated
+    # Kochrezept "Fenster-Layout-Seite" - siehe SEITEN-LOGIK.md Abschnitt 4.14.
+    unterricht:
+      color: '#7C3AED'
+      pages:
+      - name: Unterricht
+        keys:
+          0:
+            name: Start
+            title: Start
+            action: {type: layout_start, layout: unterricht}
+            icon: {type: generated}
+          1:
+            name: Browser links
+            title: Browser L
+            action: {type: layout_focus, app: browser_links, layout: unterricht}
+            icon: {type: generated}
+          2:
+            name: Browser rechts
+            title: Browser R
+            action: {type: layout_focus, app: browser_rechts, layout: unterricht}
+            icon: {type: generated}
+          3:
+            name: Chat
+            title: Chat
+            action: {type: layout_focus, app: chat, layout: unterricht}
+            icon: {type: generated}
+          5:
+            name: Bilder
+            title: Bilder
+            action: {type: layout_focus, app: bilder, layout: unterricht}
+            icon: {type: generated}
+          6:
+            name: PDF
+            title: PDF
+            action: {type: layout_focus, app: pdf, layout: unterricht}
+            icon: {type: generated}
+          10:
+            name: Zurueck blaettern
+            title: Zurueck
+            action: {type: layout_page, direction: prev, layout: unterricht}
+            icon: {type: generated}
+          11:
+            name: Vor blaettern
+            title: Weiter
+            action: {type: layout_page, direction: next, layout: unterricht}
+            icon: {type: generated}
+          12:
+            name: Maximieren
+            title: Gross/Klein
+            action: {type: layout_maximize, layout: unterricht}
+            icon: {type: generated}
+          13:
+            name: Anordnen
+            title: Anordnen
+            action: {type: layout_arrange, layout: unterricht}
+            icon: {type: generated}

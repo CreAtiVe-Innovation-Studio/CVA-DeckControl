@@ -185,6 +185,18 @@ ACTION_SCHEMA: dict[str, list[dict]] = {
     ],
     "live_view_toggle": [],
     "open_gui": [{"name": "port", "label": "Port (leer = 8420)", "type": "number"}],
+    "layout_start": [{"name": "layout", "label": "Layout (leer = einziges)", "type": "text"}],
+    "layout_arrange": [{"name": "layout", "label": "Layout (leer = einziges)", "type": "text"}],
+    "layout_focus": [
+        {"name": "app", "label": "App im Layout", "type": "text"},
+        {"name": "layout", "label": "Layout (leer = einziges)", "type": "text"},
+    ],
+    "layout_page": [
+        {"name": "direction", "label": "Richtung", "type": "select", "options": ["prev", "next"]},
+        {"name": "layout", "label": "Layout (leer = einziges)", "type": "text"},
+    ],
+    "layout_maximize": [{"name": "layout", "label": "Layout (leer = einziges)", "type": "text"}],
+    "layout_stop": [],
     "unmapped": [{"name": "note", "label": "Hinweis", "type": "readonly"}],
 }
 ICON_SCHEMA: dict[str, list[dict]] = {

@@ -46,3 +46,23 @@ set_app_volume = backend.set_app_volume
 play_sound = backend.play_sound
 show_message_popup = backend.show_message_popup
 get_active_app_id = backend.get_active_app_id
+
+# Fensterverwaltung fuer die Layout-Funktion (streamdeck_driver/windowing/) -
+# bewusst in eigenen Modulen je Plattform statt in den Haupt-Backends, damit
+# die Win32-/D-Bus-Details dieses Features getrennt bleiben. Plattformen ohne
+# Implementierung (macOS, unbekannt) bekommen harmlose Platzhalter.
+if PLATFORM == "windows":
+    from . import windows_wm as _wm
+elif PLATFORM == "linux":
+    from . import linux_wm as _wm
+else:
+    from . import no_wm as _wm
+
+list_windows = _wm.list_windows
+list_monitors = _wm.list_monitors
+move_window = _wm.move_window
+focus_window = _wm.focus_window
+maximize_window = _wm.maximize_window
+restore_window = _wm.restore_window
+minimize_window = _wm.minimize_window
+start_minimized = _wm.start_minimized

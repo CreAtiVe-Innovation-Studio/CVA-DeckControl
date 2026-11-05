@@ -19,7 +19,7 @@ from pathlib import Path
 
 import yaml
 
-from . import actions, live_view, timer_engine, update_check, window_watch
+from . import actions, live_view, timer_engine, update_check, window_watch, windowing
 from .deckone_controller import DeckOneController
 from .devices.elgato_mini import ElgatoMini
 from .icon_render import blank_icon, render_key_icon, zoom_icon
@@ -141,6 +141,7 @@ class UnifiedDaemon:
         self.deckone = DeckOneController(config)
         self.elgato = ElgatoController(config, on_switch_profile=self.deckone.switch_profile)
         self.window_watcher = window_watch.build_from_config(config, self.deckone.switch_profile)
+        windowing.configure(config)  # Fenster-Layouts ('window_layouts'), siehe SEITEN-LOGIK.md 4.14
         self._running = False
 
     def run(self) -> None:

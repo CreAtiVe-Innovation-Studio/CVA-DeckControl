@@ -44,6 +44,8 @@ a = Analysis(
         "usb.backend.libusb1",
         "PIL._tkinter_finder",
         "streamdeck_driver.platform_backend.windows",
+        "streamdeck_driver.platform_backend.windows_wm",
+        "streamdeck_driver.windowing.engine",
         "gui.server",
     ],
     hookspath=[],

@@ -2,6 +2,33 @@
 
 Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- **Window layouts** (`window_layouts` in `profiles.yaml`, SEITEN-LOGIK.md 4.14):
+  one "start" key opens missing apps and puts every window at an exact,
+  monitor-relative position (also starts background services such as a local
+  LLM server or ComfyUI, minimized, only if their port is not already open).
+  Further keys: `layout_focus` (focus-or-launch an app), `layout_page`
+  (previous/next page or image in the foreground window), `layout_maximize`
+  (maximize to the taskbar / restore into the slot), `layout_arrange`,
+  `layout_stop`. Windows opened by hand later can be positioned automatically
+  (`auto_place`).
+- `layout_hotkey` action: brings an app's window to the foreground (never
+  launches it) and then sends a key combination, so hotkeys reach the right
+  window even if another app has focus. Used to remote-control web apps via
+  F13-F24 shortcuts.
+- `tools/generate_app_icons.py`: can generate selected icons only
+  (`generate_app_icons.py zoom obs --out DIR`); many new icons.
+- `tools/capture_layout.py`: records the currently open windows as a
+  ready-to-paste `window_layouts` block (no window titles written).
+- Window management in the platform backends: `list_windows`, `list_monitors`,
+  `move_window`, `focus_window`, `maximize_window`, `restore_window`,
+  `minimize_window`, `start_minimized`. Windows: Win32 via ctypes (per-monitor
+  DPI aware, compensates the invisible window border, works around the
+  foreground lock). Linux: GNOME "Window Calls" D-Bus (untested). macOS:
+  no-op placeholder.
+
 ## [1.9.2] - 2026-09-17
 
 ### Fixed
