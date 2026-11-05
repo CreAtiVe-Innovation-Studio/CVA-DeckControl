@@ -31,3 +31,6 @@ build/
 # Editor/OS
 .DS_Store
 *.swp
+
+# Laufzeit-Zustand: zuletzt aktives DECK-ONE-Profil
+config/active_profile.state

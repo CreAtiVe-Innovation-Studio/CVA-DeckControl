@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Oeffnet MathLern (192.168.255.222:3002) zweimal in getrennten Firefox-
-Fenstern und positioniert sie praezise ueber die 'Window Calls'-GNOME-Shell-
-Extension (D-Bus org.gnome.Shell.Extensions.Windows, Pfad
-/org/gnome/Shell/Extensions/Windows):
-  - linker Bildschirm (2560x1440 @ 0,0):            /mission (voll)
-  - rechter Bildschirm (1920x1080 @ 2560,64), nur linke Haelfte: /admin/schueler
+"""Oeffnet MathLern (192.168.255.222:3002) fuer beide Seiten der Nachhilfe-
+Stunde:
+  - linker Bildschirm (Hauptmonitor, Schueler-Seite): /mission - laeuft seit
+    2026-09-19 NICHT mehr als normales lokales Firefox-Fenster, sondern
+    isoliert in einer eigenen Xephyr-Sitzung mit eigenem, zweitem DWAgent
+    (nachhilfe-xephyr-start.sh) - der Schueler bekommt per Fernzugriff
+    eigene Maus/Tastatur, komplett unabhaengig von diesem Rechner.
+  - rechter Bildschirm (1920x1080 @ 2560,64), nur linke Haelfte: /admin/
+    schueler - unveraendert ein normales lokales Firefox-Fenster fuer dich,
+    positioniert ueber die 'Window Calls'-GNOME-Shell-Extension (D-Bus
+    org.gnome.Shell.Extensions.Windows, Pfad /org/gnome/Shell/Extensions/
+    Windows).
 
 BUG GEFUNDEN 2026-09-08 (live gemeldet: statt des Layouts tippte der Nutzer
 danach staendig Zahlenfolgen in andere Fenster): dieses Skript hatte einen
@@ -26,7 +32,6 @@ import time
 from pathlib import Path
 
 BASE = "http://192.168.255.222:3002"
-LEFT = (0, 0, 2560, 1440)
 RIGHT_HALF = (2560, 64, 960, 1080)
 
 BUS = "org.gnome.Shell"
@@ -67,18 +72,31 @@ def wait_for_new_firefox_window(before_ids, timeout=10):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         for w in list_windows():
-            if "firefox" in w.get("wm_class", "").lower() and w.get("id") not in before_ids:
+            # (w.get("wm_class") or "") statt Default-Parameter: manche
+            # Fenster (z.B. das Xephyr-Fenster der Nachhilfe-Sitzung) haben
+            # den Schluessel mit explizitem Wert None statt fehlend - der
+            # Default in .get() greift dann nicht, .lower() auf None
+            # crashte hier live beobachtet.
+            if "firefox" in (w.get("wm_class") or "").lower() and w.get("id") not in before_ids:
                 return w["id"]
         time.sleep(0.3)
     raise TimeoutError("Kein neues Firefox-Fenster gefunden")
 
 
-def place_via_dbus():
-    ids_before = {w["id"] for w in list_windows()}
-    subprocess.Popen(["firefox", "--new-window", f"{BASE}/mission"])
-    win1 = wait_for_new_firefox_window(ids_before)
-    dbus_call("MoveResize", "uiiuu", win1, *LEFT)
+XEPHYR_START = "/home/alien/Dokumente/KI/Projekte/allgemeines/desktop-themes/bin/nachhilfe-xephyr-start.sh"
 
+
+def place_via_dbus():
+    # Linker Bildschirm (Schueler-Seite, /mission): NICHT mehr als normales
+    # lokales Firefox-Fenster - laeuft jetzt isoliert in einer eigenen
+    # Xephyr-Sitzung mit eigenem, zweitem DWAgent, damit der Schueler per
+    # Fernzugriff wirklich unabhaengig von diesem Rechner tippen/klicken
+    # kann (siehe nachhilfe-xephyr-start.sh). Xephyr uebernimmt den
+    # Hauptmonitor selbst vollflaechig, keine MoveResize-Platzierung noetig.
+    subprocess.Popen([XEPHYR_START])
+
+    # Rechter Bildschirm (dein Admin-Blick, /admin/schueler): unveraendert
+    # ein normales lokales Firefox-Fenster auf deinem echten Desktop.
     ids_before = {w["id"] for w in list_windows()}
     subprocess.Popen(["firefox", "--new-window", f"{BASE}/admin/schueler"])
     win2 = wait_for_new_firefox_window(ids_before)

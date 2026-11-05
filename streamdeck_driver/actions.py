@@ -6,6 +6,9 @@ Aktion zu welchem Backend-Aufruf wird."""
 from __future__ import annotations
 
 import logging
+import socket
+import threading
+import time
 
 from gui import server as gui_server
 
@@ -43,7 +46,7 @@ def run_app_volume(app_name: str, direction: str, step_percent: int = 5) -> None
 
 
 def run_website(action: dict) -> None:
-    platform_backend.open_url(action.get("url"))
+    platform_backend.open_url(action.get("url"), new_window=bool(action.get("new_window")))
 
 
 def run_ha_toggle(action: dict) -> None:
@@ -73,7 +76,24 @@ def run_open_gui(action: dict) -> None:
     'python'-Interpreter fuer ein externes Skript mehr."""
     port = int(action.get("port", 8420))
     gui_server.start_in_thread(port)
-    platform_backend.open_url(f"http://127.0.0.1:{port}/")
+    open_when_ready(port)
+
+
+def open_when_ready(port: int, timeout_s: float = 8.0) -> None:
+    """Oeffnet http://127.0.0.1:<port>/ erst, wenn der Server wirklich
+    Verbindungen annimmt - sonst landet der Browser auf 'Verbindung
+    abgelehnt', weil der Server direkt nach dem Start noch hochfaehrt."""
+    def _wait_and_open() -> None:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                    break
+            except OSError:
+                time.sleep(0.2)
+        platform_backend.open_url(f"http://127.0.0.1:{port}/")
+
+    threading.Thread(target=_wait_and_open, daemon=True).start()
 
 
 def dispatch(action: dict, key_label: str) -> None:

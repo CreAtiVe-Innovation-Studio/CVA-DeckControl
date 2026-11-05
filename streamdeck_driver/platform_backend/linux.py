@@ -68,12 +68,18 @@ def open_command(cmd: str) -> None:
         logger.error("Programm konnte nicht gestartet werden (%s): %s", cmd, exc)
 
 
-def open_url(url: str) -> None:
+def open_url(url: str, new_window: bool = False) -> None:
     if not url:
         return
+    # new_window=True startet direkt Firefox mit --new-window statt ueber
+    # xdg-open: xdg-open landet beim konfigurierten Standardbrowser als
+    # neuer Tab im bereits laufenden Fenster (Firefox-Snap laesst nur eine
+    # Instanz zu) - fuer Keys wie Teams, die ein eigenes, frei verschieb-
+    # bares Fenster brauchen, reicht das nicht.
+    cmd = ["firefox", "--new-window", url] if new_window else ["xdg-open", url]
     try:
-        subprocess.Popen(["xdg-open", url])
-        logger.info("Website geoeffnet: %s", url)
+        subprocess.Popen(cmd)
+        logger.info("Website geoeffnet (new_window=%s): %s", new_window, url)
     except OSError as exc:
         logger.error("Website konnte nicht geoeffnet werden (%s): %s", url, exc)
 
@@ -130,17 +136,30 @@ def set_app_volume(app_name: str, direction: str, step_percent: int = 5) -> None
 
     lines = result.stdout.splitlines()
     try:
-        start = next(i for i, l in enumerate(lines) if l.strip().startswith("Streams:"))
+        # .strip() entfernt nur Whitespace, nicht das Box-Zeichnungs-Praefix
+        # ("└─ Streams:"), das wpctl vor den Abschnittsnamen setzt - daher
+        # Teilstring-Suche statt startswith().
+        start = next(i for i, l in enumerate(lines) if "streams:" in l.strip().lower())
     except StopIteration:
         logger.warning("App-Lautstaerke: kein 'Streams'-Abschnitt in wpctl-Ausgabe gefunden")
         return
 
-    stream_line_re = re.compile(r"^\s*[│├└\-\s]*(\d+)\.\s*(.+?)\s*\[vol:")
+    # Aktuelle wpctl-Versionen zeigen bei "Streams" kein "[vol: ...]" mehr
+    # inline an (nur Sinks/Sources haben das) - eine Top-Level-Stream-Zeile
+    # ("118. Firefox") ist stattdessen daran zu erkennen, dass sie (anders als
+    # ihre eingerueckten Port-Unterzeilen wie "119. output_FL > ...") keinen
+    # Verbindungspfeil "> " enthaelt.
+    stream_line_re = re.compile(r"^\s*[│├└\-\s]*(\d+)\.\s*(.+?)\s*$")
     matched_ids: list[str] = []
     for line in lines[start + 1:]:
         stripped = line.strip()
-        if stripped.startswith(("Sinks", "Sources", "Filters", "Devices")) or (stripped == "" and matched_ids):
+        stripped_lower = stripped.lower()
+        if any(h in stripped_lower for h in ("sinks:", "sources:", "filters:", "devices:")) or (
+            stripped == "" and matched_ids
+        ):
             break
+        if ">" in line:
+            continue  # Port-/Verbindungs-Unterzeile, kein eigener Stream
         m = stream_line_re.match(line)
         if m and app_name.lower() in m.group(2).lower():
             matched_ids.append(m.group(1))
@@ -156,6 +175,57 @@ def set_app_volume(app_name: str, direction: str, step_percent: int = 5) -> None
             logger.info("App-Lautstaerke: '%s' (Stream-ID %s) %s%% %s", app_name, sid, step_percent, direction)
         except (subprocess.SubprocessError, FileNotFoundError) as exc:
             logger.error("App-Lautstaerke: wpctl set-volume fehlgeschlagen (ID %s): %s", sid, exc)
+
+
+def get_app_volume(app_name: str) -> int | None:
+    """Aktuelle Lautstaerke (0-100) des ersten gefundenen Audio-Streams von
+    app_name, oder None falls kein Stream laeuft / Abfrage fehlschlug. Gleiche
+    Streams-Suche wie set_app_volume(), dann 'wpctl get-volume <id>' statt
+    'set-volume' - dessen Ausgabe sieht z.B. so aus: 'Volume: 0.45' oder
+    'Volume: 0.45 [MUTED]'."""
+    try:
+        result = subprocess.run(["wpctl", "status"], capture_output=True, text=True, check=True, timeout=5)
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        logger.error("App-Lautstaerke: wpctl status fehlgeschlagen: %s", exc)
+        return None
+
+    lines = result.stdout.splitlines()
+    try:
+        start = next(i for i, l in enumerate(lines) if "streams:" in l.strip().lower())
+    except StopIteration:
+        return None
+
+    stream_line_re = re.compile(r"^\s*[│├└\-\s]*(\d+)\.\s*(.+?)\s*$")
+    matched_id: str | None = None
+    for line in lines[start + 1:]:
+        stripped = line.strip()
+        stripped_lower = stripped.lower()
+        if any(h in stripped_lower for h in ("sinks:", "sources:", "filters:", "devices:")) or (
+            stripped == "" and matched_id
+        ):
+            break
+        if ">" in line:
+            continue
+        m = stream_line_re.match(line)
+        if m and app_name.lower() in m.group(2).lower():
+            matched_id = m.group(1)
+            break
+
+    if matched_id is None:
+        return None
+
+    try:
+        vol_result = subprocess.run(
+            ["wpctl", "get-volume", matched_id], capture_output=True, text=True, check=True, timeout=5,
+        )
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        logger.error("App-Lautstaerke: wpctl get-volume fehlgeschlagen (ID %s): %s", matched_id, exc)
+        return None
+
+    m = re.search(r"([\d.]+)", vol_result.stdout)
+    if not m:
+        return None
+    return round(float(m.group(1)) * 100)
 
 
 _AUDIO_PLAYERS = ("pw-play", "aplay", "ffplay")

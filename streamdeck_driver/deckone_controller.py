@@ -9,12 +9,19 @@ import logging
 import threading
 import time
 
-from . import actions, ha_client, hw_monitor, live_view, location_map, process_monitor, radar, timer_engine
+from . import actions, ha_client, hw_monitor, live_view, location_map, platform_backend, process_monitor, radar, timer_engine
 from .devices.deckone import DeckOne
 from .icon_render import (
     add_error_badge, blank_icon, render_key_icon, render_stat_card, render_timer_card,
     render_toggle_card, render_weather_forecast_card, zoom_icon,
 )
+from .paths import app_root
+
+# Wird bei jedem Profilwechsel (und beim Start) neu geschrieben, damit externe
+# Prozesse (z.B. mouse-gesture-daemon.py, laeuft als eigener root-Systemdienst
+# und kann DeckOneController nicht direkt ansprechen) wissen, welches Profil
+# gerade aktiv ist - gleiches Datei-IPC-Prinzip wie external_trigger.py.
+ACTIVE_PROFILE_STATE_PATH = app_root() / "config" / "active_profile.state"
 
 FLASH_DURATION_S = 0.13
 # Ab dieser Haltedauer (Sekunden zwischen Druecken und Loslassen) gilt ein
@@ -40,11 +47,15 @@ class DeckOneController:
         self.config = config.get("deckone", {})
         self.device = DeckOne()
         self.active_profile = self.config.get("active_profile", "nachhilfe")
+        self._write_active_profile_state()
         self.current_page_index = 0
         self._refresh_stop = threading.Event()
         self._refresh_thread: threading.Thread | None = None
         self._radar_frame: radar.RadarFrame | None = None
         self._radar_zoom_idx = 0
+        self._radar_dirty = False
+        self._radar_worker: threading.Thread | None = None
+        self._radar_state_lock = threading.Lock()
         self._radar_info: tuple[int, dict, float] | None = None  # (key_index, aircraft, expires_at)
         self._forecast_frame: radar.RadarFrame | None = None
         self._forecast_idx = 0
@@ -382,19 +393,58 @@ class DeckOneController:
             return
         self.active_profile = profile_name
         self.current_page_index = 0
+        self.device.invalidate_image_cache()
+        self._write_active_profile_state()
         logger.info("DECK ONE: Profil gewechselt zu '%s'", profile_name)
         self.render_current_page()
+
+    def _write_active_profile_state(self) -> None:
+        try:
+            ACTIVE_PROFILE_STATE_PATH.write_text(self.active_profile)
+        except OSError as exc:
+            logger.error("Konnte active_profile.state nicht schreiben: %s", exc)
 
     def _switch_page(self, direction: int) -> None:
         pages = self._profile_pages(self.active_profile)
         if not pages:
             return
         self.current_page_index = (self.current_page_index + direction) % len(pages)
+        self.device.invalidate_image_cache()
         self.render_current_page()
 
     # -- Tastendruck ----------------------------------------------------------
 
+    def _request_radar_render(self) -> None:
+        """Zoom-Druck sofort verbuchen und im Hintergrund rendern: laeuft gerade
+        ein Render (alle 3s + Upload), wartet der Tastendruck nicht auf den
+        Lock, sondern der Worker rendert danach mit der neuesten Stufe nochmal."""
+        with self._radar_state_lock:
+            self._radar_dirty = True
+            if self._radar_worker is not None and self._radar_worker.is_alive():
+                return
+
+            def _run():
+                while True:
+                    with self._radar_state_lock:
+                        if not self._radar_dirty:
+                            self._radar_worker = None
+                            return
+                        self._radar_dirty = False
+                    try:
+                        self.render_current_page()
+                    except Exception:
+                        logger.exception("Radar-Zoom-Render fehlgeschlagen")
+
+            self._radar_worker = threading.Thread(target=_run, name="radar-zoom-render", daemon=True)
+            self._radar_worker.start()
+
     def handle_key(self, key_index: int, pressed: bool) -> None:
+        if (self.active_profile == "radar" and pressed
+                and key_index == radar.GRID_COLS * radar.GRID_ROWS - 1):
+            with self._radar_state_lock:
+                self._radar_zoom_idx = (self._radar_zoom_idx + 1) % len(radar.ZOOM_CYCLE)
+            self._request_radar_render()
+            return
         with self._render_lock:
             if self.active_profile in ("radar", "wetter_vorhersage", "wo_ist") and not pressed:
                 return
@@ -481,7 +531,8 @@ class DeckOneController:
                 timer_engine.handle_press(self._timer_key_id(key_index), duration_min, action.get("sound"))
                 self.render_current_page()  # manuelles Sofort-Auffrischen bei Druck, wie live_stat
             elif action_type == "live_view_toggle":
-                live_view.toggle_enabled_flag()  # eigentliches Starten/Stoppen macht die Haupt-Loop (daemon.py)
+                if live_view.toggle_enabled_flag():  # eigentliches Starten/Stoppen macht die Haupt-Loop (daemon.py)
+                    actions.open_when_ready(live_view.PORT)
                 self.render_current_page()
             else:
                 actions.dispatch(action, key.get("title") or key.get("name", ""))

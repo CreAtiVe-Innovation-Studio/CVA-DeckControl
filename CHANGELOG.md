@@ -29,6 +29,21 @@ Format loosely based on [Keep a Changelog](https://keepachangelog.com/).
   foreground lock). Linux: GNOME "Window Calls" D-Bus (untested). macOS:
   no-op placeholder.
 
+### Fixed
+- DECK ONE: key presses were lost while the radar re-rendered (the key
+  callback ran on the USB read thread and blocked on the render lock). Key
+  events are now dispatched from a worker queue; the radar zoom key counts
+  presses immediately and renders in the background.
+- DECK ONE: only changed key images are uploaded (15 s max age, full upload on
+  page/profile switch, uploads serialized by a lock); the commit command is
+  only sent after real uploads (otherwise static pages turned black).
+- Radar: adsb.lol's daily limit (500 requests) was exhausted by frequent
+  renders, so no aircraft were shown. Fallback to adsb.fi plus a minimum
+  request interval.
+- Timer page: switching the live view on opens it in the browser; the
+  settings key waits for the GUI port before opening it. `website` actions can
+  open a separate window (`new_window: true`).
+
 ## [1.9.2] - 2026-09-17
 
 ### Fixed

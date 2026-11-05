@@ -19,7 +19,7 @@ from pathlib import Path
 
 import yaml
 
-from . import actions, live_view, timer_engine, update_check, window_watch, windowing
+from . import actions, external_trigger, live_view, timer_engine, update_check, window_watch, windowing
 from .deckone_controller import DeckOneController
 from .devices.elgato_mini import ElgatoMini
 from .icon_render import blank_icon, render_key_icon, zoom_icon
@@ -184,6 +184,8 @@ class UnifiedDaemon:
                     logger.error("Beide Geraete getrennt - beende Daemon")
                     break
                 live_view.sync_with_flag_file()
+                if deckone_ok:
+                    external_trigger.sync_with_flag_files(self.deckone)
                 time.sleep(0.5)
         except KeyboardInterrupt:
             pass

@@ -396,22 +396,38 @@ def _cell_origin(col: int, row: int) -> tuple[int, int]:
 # -- Flugzeuge (adsb.lol) -----------------------------------------------------
 
 _last_aircraft: list[dict] = []
+_last_aircraft_fetch = 0.0
+_adsb_lol_blocked_until = 0.0
+AIRCRAFT_MIN_INTERVAL_S = 8.0
 
 
 def _fetch_aircraft(radius_km: float) -> list[dict]:
-    """Bei einem fehlgeschlagenen/gedrosselten Request (adsb.lol limitiert
-    bei zu haeufigen Anfragen mit 429) wird die letzte bekannte Liste
-    zurueckgegeben statt einer leeren - sonst 'verschwinden' kurz alle
-    Flugzeuge bei jedem Ausfall, statt einfach kurz stehenzubleiben."""
-    global _last_aircraft
-    radius_nm = radius_km / 1.852
-    url = f"https://api.adsb.lol/v2/point/{HOME_LAT}/{HOME_LON}/{int(radius_nm) + 5}"
-    try:
-        resp = requests.get(url, timeout=6)
-        resp.raise_for_status()
-        _last_aircraft = resp.json().get("ac", [])
-    except requests.RequestException as exc:
-        logger.warning("adsb.lol Abfrage fehlgeschlagen, zeige letzten bekannten Stand: %s", exc)
+    """Primaer adsb.lol, bei 429 (Tageslimit 500 Anfragen) Fallback auf
+    adsb.fi (gleiches readsb-Format, nur anderer Feldname). Zusaetzlich ein
+    Mindestabstand zwischen Abrufen, weil build_frame() sehr haeufig laeuft.
+    Bei Fehlern bleibt die letzte bekannte Liste stehen statt leer zu werden."""
+    global _last_aircraft, _last_aircraft_fetch, _adsb_lol_blocked_until
+    now = time.monotonic()
+    if now - _last_aircraft_fetch < AIRCRAFT_MIN_INTERVAL_S:
+        return _last_aircraft
+    _last_aircraft_fetch = now
+    radius_nm = int(radius_km / 1.852) + 5
+    sources = []
+    if now >= _adsb_lol_blocked_until:
+        sources.append((
+            "adsb.lol", f"https://api.adsb.lol/v2/point/{HOME_LAT}/{HOME_LON}/{radius_nm}", "ac"))
+    sources.append((
+        "adsb.fi", f"https://opendata.adsb.fi/api/v2/lat/{HOME_LAT}/lon/{HOME_LON}/dist/{radius_nm}", "aircraft"))
+    for name, url, key in sources:
+        try:
+            resp = requests.get(url, timeout=6)
+            if resp.status_code == 429 and name == "adsb.lol":
+                _adsb_lol_blocked_until = now + 1800
+            resp.raise_for_status()
+            _last_aircraft = resp.json().get(key, [])
+            return _last_aircraft
+        except requests.RequestException as exc:
+            logger.warning("%s Abfrage fehlgeschlagen: %s", name, exc)
     return _last_aircraft
 
 

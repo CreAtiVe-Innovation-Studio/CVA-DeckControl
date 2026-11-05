@@ -219,6 +219,7 @@ from __future__ import annotations
 
 import io
 import logging
+import queue
 import struct
 import sys
 import threading
@@ -260,6 +261,9 @@ CMD_LIGHT_PREFIX = b"LIG\x00\x00"
 # Nullbytes zwischen "CLE" und dem Parameter (nicht zwei wie bei DIS/LIG) -
 # exakt so im Mitschnitt bestaetigt: 43 4c 45 00 00 00 ff. Parameter 0xff so
 # beobachtet (Bedeutung selbst unklar, evtl. "clear target = alle Tasten").
+# Spaetestens nach so vielen Sekunden wird eine Kachel trotz gleichem Bild neu
+# hochgeladen - heilt gestoerte Uploads, die sonst im Cache 'erledigt' waeren.
+IMAGE_CACHE_MAX_AGE_S = 15.0
 CMD_CLEAR = b"CLE\x00\x00\x00" + bytes([0xFF])
 CMD_STOP = b"STP\x00\x00"
 CMD_IMAGE_TOKEN = b"BAT\x00\x00"
@@ -312,6 +316,8 @@ class DeckOne(StreamDeckDevice):
         self._detached_interfaces: list[int] = []
         self._event_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+
+    _upload_lock = threading.RLock()
 
     @property
     def connected(self) -> bool:
@@ -420,6 +426,7 @@ class DeckOne(StreamDeckDevice):
         try:
             self._write_frame(_framed(CMD_CLEAR))
             logger.info("DECK ONE: Clear-Kommando gesendet")
+            self.__dict__.pop("_last_jpeg", None)
         except Exception as exc:
             logger.warning("DECK ONE: Clear-Kommando fehlgeschlagen: %s", exc)
             return False
@@ -470,6 +477,13 @@ class DeckOne(StreamDeckDevice):
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=90)
         jpeg_bytes = buf.getvalue()
+        # Unveraenderte Kacheln nicht erneut hochladen: waehrend eines Uploads
+        # sendet das Geraet keine Tastenreports, bei 15 Kacheln alle 3s (Radar)
+        # gingen so viele Tastendruecke verloren.
+        last = self.__dict__.setdefault("_last_jpeg", {})
+        cached = last.get(key_index)
+        if cached is not None and cached[0] == jpeg_bytes and time.monotonic() - cached[1] < IMAGE_CACHE_MAX_AGE_S:
+            return True
 
         key_id = _key_index_to_device_key_id(key_index)
         # KORRIGIERT 2026-08-21: eigene Analyse des Windows-Mitschnitts
@@ -484,26 +498,40 @@ class DeckOne(StreamDeckDevice):
         header_payload = CMD_IMAGE_TOKEN + struct.pack(">H", len(jpeg_bytes)) + bytes([key_id])
 
         try:
-            self._write_frame(_framed(header_payload))
-            for i in range(0, len(jpeg_bytes), PACKET_SIZE):
-                chunk = jpeg_bytes[i : i + PACKET_SIZE]
-                if len(chunk) < PACKET_SIZE:
-                    chunk = chunk + bytes(PACKET_SIZE - len(chunk))
-                # Reine Datenpakete (keine CRT-Kommandohuelle) brauchen KEIN
-                # _framed() - sie sind schon exakt PACKET_SIZE lang.
-                self._write_frame(chunk)
+            with self._upload_lock:
+                self._write_frame(_framed(header_payload))
+                for i in range(0, len(jpeg_bytes), PACKET_SIZE):
+                    chunk = jpeg_bytes[i : i + PACKET_SIZE]
+                    if len(chunk) < PACKET_SIZE:
+                        chunk = chunk + bytes(PACKET_SIZE - len(chunk))
+                    # Reine Datenpakete (keine CRT-Kommandohuelle) brauchen KEIN
+                    # _framed() - sie sind schon exakt PACKET_SIZE lang.
+                    self._write_frame(chunk)
+            last[key_index] = (jpeg_bytes, time.monotonic())
+            self._pending_commit = True
             return True
         except Exception as exc:
+            last.pop(key_index, None)
             logger.error("DECK ONE Bild setzen fehlgeschlagen (Taste %s): %s", key_index, exc)
             return False
+
+    def invalidate_image_cache(self) -> None:
+        """Naechster Upload sendet wieder alle Tasten (z.B. bei Seitenwechsel)."""
+        self.__dict__.pop("_last_jpeg", None)
 
     def end_batch(self) -> bool:
         """Sendet das Abschluss-/Refresh-Kommando nach dem Hochladen aller
         Tasten einer Seite/eines Profils."""
         if self._dev is None:
             return False
+        # Abschluss-Kommando nur, wenn wirklich Bilder hochgeladen wurden: ohne
+        # neue Uploads zeigt das Geraet sonst einen leeren Puffer (schwarz).
+        if not self.__dict__.get("_pending_commit"):
+            return True
         try:
-            self._write_frame(_framed(CMD_STOP))
+            with self._upload_lock:
+                self._pending_commit = False
+                self._write_frame(_framed(CMD_STOP))
             return True
         except Exception as exc:
             logger.warning("DECK ONE: Abschluss-Kommando fehlgeschlagen: %s", exc)
@@ -522,6 +550,25 @@ class DeckOne(StreamDeckDevice):
         # 512 Byte ergaben. Groesserer Lesepuffer (nur fuer den Lesevorgang,
         # das Schreib-Framing bleibt bei den protokoll-vorgegebenen 512 Byte).
         READ_BUFFER_SIZE = 4096
+
+        # Callbacks laufen auf einem eigenen Worker-Thread: handle_key() kann
+        # auf dem Render-Lock warten (Radar-Render + Bild-Upload, mehrere
+        # Sekunden). Haengt der Lese-Thread dort fest, liest niemand mehr
+        # Events -> Report-Puffer laeuft voll, Tastendruecke gehen verloren.
+        event_queue: "queue.Queue[tuple[int, bool] | None]" = queue.Queue()
+        self._event_queue = event_queue
+
+        def _dispatch_worker():
+            while True:
+                item = event_queue.get()
+                if item is None:
+                    return
+                try:
+                    callback(*item)
+                except Exception:
+                    logger.exception("Fehler im DECK ONE Key-Callback")
+
+        threading.Thread(target=_dispatch_worker, name="deckone-key-dispatch", daemon=True).start()
 
         def _run():
             last_state = [False] * NUM_KEYS
@@ -617,10 +664,7 @@ class DeckOne(StreamDeckDevice):
                     if 0 <= key_index < NUM_KEYS:
                         if pressed != last_state[key_index]:
                             last_state[key_index] = pressed
-                            try:
-                                callback(key_index, pressed)
-                            except Exception:
-                                logger.exception("Fehler im DECK ONE Key-Callback")
+                            event_queue.put((key_index, pressed))
                     else:
                         logger.debug("DECK ONE: unbekannter Rohindex %s, Rohdaten: %s", raw_key, data[idx:idx + 16].hex())
                     offset = idx + 11
@@ -635,3 +679,6 @@ class DeckOne(StreamDeckDevice):
         if self._event_thread is not None:
             self._event_thread.join(timeout=2)
             self._event_thread = None
+        q = getattr(self, "_event_queue", None)
+        if q is not None:
+            q.put(None)
