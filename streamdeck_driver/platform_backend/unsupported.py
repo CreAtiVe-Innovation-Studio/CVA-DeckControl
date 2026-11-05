@@ -22,7 +22,9 @@ def open_command(cmd: str) -> None:
     _warn("Programm oeffnen")
 
 
-def open_url(url: str) -> None:
+def open_url(url: str, new_window: bool = False) -> None:
+    # new_window wird nur unter Linux ausgewertet (eigenes Firefox-Fenster); hier akzeptiert
+    # und ignoriert, damit actions.run_website() auf allen Plattformen gleich aufrufen kann.
     _warn("Website oeffnen")
 
 

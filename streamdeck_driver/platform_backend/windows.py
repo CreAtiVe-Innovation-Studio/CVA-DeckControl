@@ -113,7 +113,9 @@ def open_command(cmd: str) -> None:
         logger.error("Programm konnte nicht gestartet werden (%s): %s", cmd, exc)
 
 
-def open_url(url: str) -> None:
+def open_url(url: str, new_window: bool = False) -> None:
+    # new_window wird nur unter Linux ausgewertet (eigenes Firefox-Fenster); hier akzeptiert
+    # und ignoriert, damit actions.run_website() auf allen Plattformen gleich aufrufen kann.
     if not url:
         return
     try:
