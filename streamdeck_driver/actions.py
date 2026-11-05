@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import socket
+import sys
 import threading
 import time
 
@@ -16,6 +17,25 @@ from . import ha_client, platform_backend, windowing
 
 logger = logging.getLogger("streamdeck_driver.actions")
 
+_IS_WINDOWS = sys.platform == "win32"
+
+
+def _resolve_open_cmd(step: dict) -> str | None:
+    """Waehlt den Befehl fuer eine Open-Aktion/einen Sequenz-Schritt. Beim
+    Windows-Import aus dem urspruenglichen Deck-Manifest wurde 'original_path'
+    (der echte Windows-Programmpfad) mitgefuehrt, bevor er fuer den Linux-
+    Betrieb durch 'linux_command' ersetzt wurde (siehe manifest_parser.py) -
+    unter Windows ist original_path daher fast immer die bessere Wahl, wo
+    vorhanden. Ausnahme bewusst NICHT gesondert behandelt: einzelne Eintraege,
+    bei denen linux_command absichtlich vom Original abweicht (z.B. Teams-Web
+    statt nativer App), werden dadurch auf ihr urspruengliches Verhalten
+    zurueckgesetzt - das ist fuer den Windows-Fall i.d.R. sogar erwuenscht,
+    da die native Windows-App zur Verfuegung steht."""
+    original = step.get("original_path")
+    if _IS_WINDOWS and original:
+        return original
+    return step.get("linux_command")
+
 
 def run_hotkey(action: dict) -> None:
     platform_backend.send_hotkey(
@@ -24,7 +44,7 @@ def run_hotkey(action: dict) -> None:
 
 
 def run_open(action: dict) -> None:
-    cmd = action.get("linux_command")
+    cmd = _resolve_open_cmd(action)
     if not cmd:
         logger.warning(
             "Open-Aktion ohne bekannten Befehl (original_path=%s, note=%s) - ignoriert",
@@ -36,7 +56,7 @@ def run_open(action: dict) -> None:
 
 def run_open_sequence(action: dict) -> None:
     for step in action.get("steps", []):
-        cmd = step.get("linux_command")
+        cmd = _resolve_open_cmd(step)
         if cmd:
             platform_backend.open_command(cmd)
 

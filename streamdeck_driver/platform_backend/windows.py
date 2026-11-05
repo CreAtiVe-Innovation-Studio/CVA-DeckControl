@@ -98,7 +98,50 @@ def send_hotkey(vkeycode: int, ctrl: bool, shift: bool, alt: bool) -> None:  # U
 
 
 def open_command(cmd: str) -> None:
+    """Lokaler Zusatz-Fix (noch nicht upstream): 'linux_command' ist teils ein
+    Linux-Idiom "programm protokoll://..." (z.B. Steam-Spiele startet man unter
+    Linux per "steam steam://rungameid/123") - auf Windows ist "steam" aber
+    kein PATH-Programm, nur ein steam:// URL-Protocol-Handler in der Registry
+    (HKCR\\steam\\shell\\open\\command). Ein enthaltenes URI-Token wird daher
+    direkt ueber os.startfile() an den registrierten Handler gegeben - das
+    Windows-Aequivalent von xdg-open."""
     if not cmd:
+        return
+    parts = shlex.split(cmd, posix=False)
+    # xdg-open <pfad-oder-url> ist Linux' generischer "oeffne das damit, was
+    # auch immer dafuer zustaendig ist" - os.startfile() ist genau das unter
+    # Windows (funktioniert fuer Dateien, Ordner UND URLs gleichermassen).
+    if parts and parts[0] == "xdg-open" and len(parts) > 1:
+        target = parts[1]
+        try:
+            import os
+            os.startfile(target)
+            logger.info("Per xdg-open-Uebersetzung geoeffnet: %s", target)
+        except OSError as exc:
+            logger.error("xdg-open-Ziel konnte nicht geoeffnet werden (%s): %s", target, exc)
+        return
+    # Einzelnes Token ohne Argumente (ein Programm ODER ein Ordner-/Dateipfad):
+    # os.startfile() nutzt intern ShellExecute, das - anders als subprocess.
+    # Popen()/CreateProcess() - auch ueber PATH/App-Paths-Registry aufloest
+    # und Ordner oeffnen kann (wie ein Doppelklick im Explorer). Robuster als
+    # der Popen-Fallback unten, der bei einem Ordnerpfad scheitern wuerde
+    # ("kann Verzeichnis nicht ausfuehren").
+    if len(parts) == 1:
+        try:
+            import os
+            os.startfile(parts[0])
+            logger.info("Geoeffnet (Einzelpfad): %s", parts[0])
+        except OSError as exc:
+            logger.error("Konnte nicht geoeffnet werden (%s): %s", parts[0], exc)
+        return
+    uri = next((p for p in parts if "://" in p), None)
+    if uri:
+        try:
+            import os
+            os.startfile(uri)
+            logger.info("URI geoeffnet: %s", uri)
+        except OSError as exc:
+            logger.error("URI konnte nicht geoeffnet werden (%s): %s", uri, exc)
         return
     try:
         # creationflags=CREATE_NO_WINDOW: verhindert ein aufblitzendes leeres
@@ -107,7 +150,7 @@ def open_command(cmd: str) -> None:
         # (console=False in der gebauten .exe) - siehe hw_monitor.py fuer den
         # Bug, der das live gezeigt hat. Betrifft KEINE GUI-Programme (Spiele,
         # Browser etc.) - die bekommen so oder so nie ein Konsolenfenster.
-        subprocess.Popen(shlex.split(cmd, posix=False), creationflags=subprocess.CREATE_NO_WINDOW)
+        subprocess.Popen(parts, creationflags=subprocess.CREATE_NO_WINDOW)
         logger.info("Programm gestartet: %s", cmd)
     except OSError as exc:
         logger.error("Programm konnte nicht gestartet werden (%s): %s", cmd, exc)
